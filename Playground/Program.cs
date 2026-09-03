@@ -240,55 +240,10 @@ namespace Playground
 
         static JsonSerializer CreateSampleSerializer2(int bufferChunkSize)
         {
-            var settings = new JsonSerializer.Settings()
+            var deserializer = new JsonDeserializer(settings =>
             {
-                writeBufferChunkSize = bufferChunkSize,
-                dataSelection = JsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
-                referenceCheck = JsonSerializer.ReferenceCheck.NoRefCheck,
-                typeInfoHandling = JsonSerializer.TypeInfoHandling.AddDeviatingTypeInfo,
-                enumAsString = true,
-                indent = false,
-                writeByteArrayAsBase64String = true
-            };
-            settings.ConfigureType<SampleMessage>(ts =>
-            {
-                ts.SetCustomTypeWriter(prep =>
-                {
-                    var objectWriter = prep.PrepareTypeWriter<object>(os => os.SetTypeInfoHandling(JsonSerializer.TypeInfoHandling.AddNoTypeInfo));
-                    return prep.PrepareObjectWriter<SampleMessage>(objBuilder =>
-                    {
-                        objBuilder
-                            .AddField("deviceName", m => m.deviceName)
-                            .AddField("nodeId", m => m.nodeId)
-                            .AddField("browsePaths", m => m.browsePaths)
-                            .AddField("nsName", m => m.nsName)
-                            //.AddRawField("value", (api, m) => objectWriter(m.sample.value))
-                            .AddField("value", m => m.sample.value)
-                            .AddField("valueType", m => m.sample.value?.GetType().GetSimplifiedTypeName())
-                            .AddField("sourceTimestamp", m => m.sample.sourceTimestamp);
-                    });
-                });
+                settings.castObjectArrayToCommonTypeArray
             });
-            return new JsonSerializer(settings);
-        }
-
-        private static async Task Main()
-        {
-            var ser = CreateSampleSerializer2(1024 * 256);
-            var sampleMessage = new SampleMessage()
-            {
-                deviceName = "Device1",
-                nodeId = "Node1",
-                browsePaths = new string[] { "Path1", "Path2" },
-                nsName = "Namespace1",
-                sample = new Sample()
-                {
-                    value = 42,
-                    sourceTimestamp = DateTime.Now,
-                    serverTimestamp = DateTime.Now
-                }
-            };
-            var jj = ser.Serialize<object>(sampleMessage);
 
         }
     }

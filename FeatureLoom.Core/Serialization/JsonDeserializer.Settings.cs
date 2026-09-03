@@ -691,6 +691,12 @@ public sealed partial class JsonDeserializer
         /// <summary>Type/member-level populate-existing-members behavior override.</summary>
         internal bool? populateAsMember = null;
 
+        /// <summary>Type/member-level object-array common-type casting override.</summary>
+        internal bool? castObjectArrayToCommonTypeArray;
+
+        /// <summary>Type/member-level uninitialized-object creation override.</summary>
+        internal bool? allowUninitializedObjectCreation;
+
         /// <summary>Type/member-level unknown-field behavior override.</summary>
         internal UnknownFieldPolicy? unknownFieldPolicy;
 
@@ -736,6 +742,15 @@ public sealed partial class JsonDeserializer
         /// <summary>Enables or disables populate-existing-member behavior for this type scope.</summary>
         public void SetPopulateAsMember(bool populate) => populateAsMember = populate;
 
+        /// <summary>Enables or disables conversion of <see cref="object"/> arrays to a common typed array for this scope.</summary>
+        public void SetCastObjectArrayToCommonTypeArray(bool value) => castObjectArrayToCommonTypeArray = value;
+
+        /// <summary>
+        /// Enables or disables creation without invoking a constructor for this scope.
+        /// </summary>
+        /// <remarks>This is effective only with <see cref="DataAccess.PublicAndPrivateFields"/>.</remarks>
+        public void SetAllowUninitializedObjectCreation(bool value) => allowUninitializedObjectCreation = value;
+
         /// <summary>Sets backing-field lookup mode for this type scope.</summary>
         public void SetBackingFieldMode(BackingFieldMode mode) => backingFieldMode = mode;
 
@@ -772,6 +787,8 @@ public sealed partial class JsonDeserializer
                 enableReferenceResolution = enableReferenceResolution ?? broaderSettings.enableReferenceResolution,
                 applyProposedTypes = applyProposedTypes ?? broaderSettings.applyProposedTypes,
                 populateAsMember = populateAsMember ?? broaderSettings.populateAsMember,
+                castObjectArrayToCommonTypeArray = castObjectArrayToCommonTypeArray ?? broaderSettings.castObjectArrayToCommonTypeArray,
+                allowUninitializedObjectCreation = allowUninitializedObjectCreation ?? broaderSettings.allowUninitializedObjectCreation,
                 unknownFieldPolicy = unknownFieldPolicy ?? broaderSettings.unknownFieldPolicy,
                 constructor = constructor ?? broaderSettings.constructor,
                 collectionConstructor = collectionConstructor ?? broaderSettings.collectionConstructor,
@@ -810,6 +827,8 @@ public sealed partial class JsonDeserializer
                 enableReferenceResolution = enableReferenceResolution,
                 applyProposedTypes = applyProposedTypes,
                 populateAsMember = populateAsMember,
+                castObjectArrayToCommonTypeArray = castObjectArrayToCommonTypeArray,
+                allowUninitializedObjectCreation = allowUninitializedObjectCreation,
                 unknownFieldPolicy = unknownFieldPolicy,
                 constructor = constructor,
                 collectionConstructor = collectionConstructor,
@@ -934,6 +953,7 @@ public sealed partial class JsonDeserializer
         internal bool? enableReferenceResolution;
         internal bool? applyProposedTypes;
         internal bool? populateAsMember;
+        internal bool? castObjectArrayToCommonTypeArray;
         internal bool? useStringCache;
         internal UnknownFieldPolicy? unknownFieldPolicy;
 
@@ -942,6 +962,7 @@ public sealed partial class JsonDeserializer
         public void SetReferenceResolution(bool value) => enableReferenceResolution = value;
         public void SetProposedTypeHandling(bool value) => applyProposedTypes = value;
         public void SetPopulateAsMember(bool value) => populateAsMember = value;
+        public void SetCastObjectArrayToCommonTypeArray(bool value) => castObjectArrayToCommonTypeArray = value;
         public void SetUseStringCache(bool value) => useStringCache = value;
         public void SetUnknownFieldPolicy(UnknownFieldPolicy value) => unknownFieldPolicy = value;
 
@@ -955,6 +976,7 @@ public sealed partial class JsonDeserializer
                 enableReferenceResolution = enableReferenceResolution ?? outer.enableReferenceResolution,
                 applyProposedTypes = applyProposedTypes ?? outer.applyProposedTypes,
                 populateAsMember = populateAsMember ?? outer.populateAsMember,
+                castObjectArrayToCommonTypeArray = castObjectArrayToCommonTypeArray ?? outer.castObjectArrayToCommonTypeArray,
                 useStringCache = useStringCache ?? outer.useStringCache,
                 unknownFieldPolicy = unknownFieldPolicy ?? outer.unknownFieldPolicy
             };
@@ -968,6 +990,7 @@ public sealed partial class JsonDeserializer
             enableReferenceResolution == other.enableReferenceResolution &&
             applyProposedTypes == other.applyProposedTypes &&
             populateAsMember == other.populateAsMember &&
+            castObjectArrayToCommonTypeArray == other.castObjectArrayToCommonTypeArray &&
             useStringCache == other.useStringCache &&
             unknownFieldPolicy == other.unknownFieldPolicy;
 
@@ -985,6 +1008,7 @@ public sealed partial class JsonDeserializer
                 enableReferenceResolution = local?.enableReferenceResolution ?? enableReferenceResolution,
                 applyProposedTypes = local?.applyProposedTypes ?? applyProposedTypes,
                 populateAsMember = local?.populateAsMember ?? populateAsMember,
+                castObjectArrayToCommonTypeArray = local?.castObjectArrayToCommonTypeArray ?? castObjectArrayToCommonTypeArray,
                 unknownFieldPolicy = local?.unknownFieldPolicy ?? unknownFieldPolicy,
                 constructor = local?.constructor,
                 collectionConstructor = local?.collectionConstructor,

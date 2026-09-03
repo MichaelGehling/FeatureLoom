@@ -855,10 +855,14 @@ public sealed partial class JsonDeserializer
     }
 
     private TypeReaderInitializer CreateUnknownObjectReader(BaseTypeSettings typeSettings)
-    {        
+    {
+        bool castObjectArrayToCommonTypeArray = typeSettings?.castObjectArrayToCommonTypeArray ?? settings.castObjectArrayToCommonTypeArray;
+        Func<object> readUnknownValue = castObjectArrayToCommonTypeArray == settings.castObjectArrayToCommonTypeArray
+            ? ReadUnknownValue
+            : () => ReadUnknownValue(castObjectArrayToCommonTypeArray);
         if (typeSettings == null || typeSettings.multiOptionMappedTypes.Count == 0)
         {
-            return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true, typeSettings);
+            return TypeReaderInitializer.Create(this, readUnknownValue, null, true, typeSettings);
         }
         var typeOptions = typeSettings.multiOptionMappedTypes;      
 
@@ -882,7 +886,7 @@ public sealed partial class JsonDeserializer
 
         if (arrayTypeOption == null && objectTypeOptions.Count == 0 && preparedValueCheckers.Length == 0)
         {
-            return TypeReaderInitializer.Create(this, ReadUnknownValue, null, true, typeSettings);
+            return TypeReaderInitializer.Create(this, readUnknownValue, null, true, typeSettings);
         }
 
         if (arrayTypeOption == null) arrayTypeOption = typeof(List<object>);
@@ -2526,8 +2530,8 @@ public sealed partial class JsonDeserializer
         else if (type.IsValueType) return () => default;
         else if (!TryCompileConstructor<T>(out constructor, derivedType))
         {
-            bool canUseUninitialized = settings.allowUninitializedObjectCreation &&
-                                       settings.dataAccess == DataAccess.PublicAndPrivateFields;
+            bool canUseUninitialized = (typeSettings?.allowUninitializedObjectCreation ?? settings.allowUninitializedObjectCreation) &&
+                                       (typeSettings?.dataAccess ?? settings.dataAccess) == DataAccess.PublicAndPrivateFields;
 
             if (canUseUninitialized)
             {

@@ -465,6 +465,11 @@ namespace FeatureLoom.Serialization
             }
         }
 
+        private class NoDefaultCtorHolder
+        {
+            public NoDefaultCtorReadonlyField Local;
+        }
+
         private class NoDefaultCtorReadonlyField
         {
             public readonly int X;
@@ -710,6 +715,40 @@ namespace FeatureLoom.Serialization
 
             Assert.False(deserializer.TryDeserialize("{\"X\":7}", out NoDefaultCtorReadonlyField value));
             Assert.Null(value);
+        }
+
+        [Fact]
+        public void Settings_TypeSetting_CanEnableUninitializedObjectCreation()
+        {
+            var settings = new JsonDeserializer.Settings
+            {
+                allowUninitializedObjectCreation = false,
+                dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields
+            };
+            settings.ConfigureType<NoDefaultCtorReadonlyField>(type => type.SetAllowUninitializedObjectCreation(true));
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"X\":7}", out NoDefaultCtorReadonlyField value));
+            Assert.Equal(7, value.X);
+        }
+
+        [Fact]
+        public void Settings_MemberSetting_CanEnableUninitializedObjectCreationLocally()
+        {
+            var settings = new JsonDeserializer.Settings
+            {
+                allowUninitializedObjectCreation = false,
+                dataAccess = JsonDeserializer.DataAccess.PublicAndPrivateFields,
+                rethrowExceptions = false,
+                logCatchedExceptions = false
+            };
+            settings.ConfigureType<NoDefaultCtorHolder>(type =>
+                type.ConfigureMember<NoDefaultCtorReadonlyField>(nameof(NoDefaultCtorHolder.Local), member =>
+                    member.SetAllowUninitializedObjectCreation(true)));
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"Local\":{\"X\":7}}", out NoDefaultCtorHolder value));
+            Assert.Equal(7, value.Local.X);
         }
 
         [Fact]
@@ -2103,6 +2142,67 @@ namespace FeatureLoom.Serialization
             Assert.True(deserializer.TryDeserialize("[1,2]", out object value));
             var array = Assert.IsType<object[]>(value);
             Assert.Equal(new object[] { 1, 2 }, array);
+        }
+
+        private class ObjectArrayScope
+        {
+            public object Cast;
+            public object Plain;
+        }
+
+        private class RecursiveObjectArrayScope
+        {
+            public object Value;
+            public RecursiveObjectArrayScope Child;
+        }
+
+        [Fact]
+        public void Settings_MemberSetting_CanOverrideObjectArrayCommonTypeCasting()
+        {
+            var settings = new JsonDeserializer.Settings
+            {
+                castObjectArrayToCommonTypeArray = false
+            };
+            settings.ConfigureType<ObjectArrayScope>(type =>
+                type.ConfigureMember<object>(nameof(ObjectArrayScope.Cast), member =>
+                    member.SetCastObjectArrayToCommonTypeArray(true)));
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"Cast\":[1,2],\"Plain\":[1,2]}", out ObjectArrayScope value));
+            Assert.IsType<int[]>(value.Cast);
+            Assert.IsType<object[]>(value.Plain);
+        }
+
+        [Fact]
+        public void Settings_TypeSetting_CanOverrideObjectArrayCommonTypeCasting()
+        {
+            var settings = new JsonDeserializer.Settings
+            {
+                castObjectArrayToCommonTypeArray = false
+            };
+            settings.ConfigureType<object>(type => type.SetCastObjectArrayToCommonTypeArray(true));
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("[1,2]", out object value));
+            Assert.IsType<int[]>(value);
+        }
+
+        [Fact]
+        public void Settings_RecursiveSetting_AppliesObjectArrayCommonTypeCastingToDescendants()
+        {
+            var settings = new JsonDeserializer.Settings
+            {
+                castObjectArrayToCommonTypeArray = false
+            };
+            settings.ConfigureType<RecursiveObjectArrayScope>(type =>
+                type.ConfigureRecursively(recursive => recursive.SetCastObjectArrayToCommonTypeArray(true)));
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize(
+                "{\"Value\":[1,2],\"Child\":{\"Value\":[3,4]}}",
+                out RecursiveObjectArrayScope value));
+            Assert.IsType<int[]>(value.Value);
+            Assert.IsType<int[]>(value.Child.Value);
         }
 
         [Fact]

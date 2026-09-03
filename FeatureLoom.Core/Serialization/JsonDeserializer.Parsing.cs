@@ -103,7 +103,9 @@ public sealed partial class JsonDeserializer
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private object ReadUnknownValue()
+    private object ReadUnknownValue() => ReadUnknownValue(settings.castObjectArrayToCommonTypeArray);
+
+    private object ReadUnknownValue(bool castObjectArrayToCommonTypeArray)
     {
         var valueType = Lookup(map_TypeStart, buffer.CurrentByte);
         if (valueType == TypeResult.Whitespace)
@@ -118,7 +120,7 @@ public sealed partial class JsonDeserializer
             case TypeResult.Object: return ReadObjectValueAsDictionary();
             case TypeResult.Bool: return ReadBoolValue();
             case TypeResult.Null: return ReadNullValue();
-            case TypeResult.Array: return ReadArrayValue();
+            case TypeResult.Array: return ReadArrayValue(castObjectArrayToCommonTypeArray);
             case TypeResult.Number: return ReadNumberValueAsObject();
             default: throw new Exception("Invalid character for determining value");
         }
@@ -136,11 +138,11 @@ public sealed partial class JsonDeserializer
     CollectionCaster collectionCaster = new CollectionCaster();
     CachedTypeReader cachedObjectArrayReader = null;
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private object ReadArrayValue()
+    private object ReadArrayValue(bool castObjectArrayToCommonTypeArray)
     {
         if (cachedObjectArrayReader == null) cachedObjectArrayReader = CreateCachedTypeReader(typeof(object[]));
         var objectsArray = cachedObjectArrayReader.ReadValue_NoCheck<object[]>();
-        if (!settings.castObjectArrayToCommonTypeArray || objectsArray.Length == 0) return objectsArray;
+        if (!castObjectArrayToCommonTypeArray || objectsArray.Length == 0) return objectsArray;
 
         var castedArray = collectionCaster.CastToCommonTypeArray(objectsArray, out _);
         return castedArray;

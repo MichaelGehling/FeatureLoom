@@ -17,6 +17,8 @@ applyTo: "**/Serialization/**"
 	- `BaseTypeWriteSettings.ConfigureRecursively` applies restricted policy defaults to the configured type/member/element scope and its complete value subtree during writer preparation. Local type/member/element settings win per option; nested recursive settings layer onto inherited settings; dictionary keys are excluded.
 - Manual UTF-8 parsing over pooled buffers. Readers/writers are compiled once per type and cached; per-member configuration is baked into strategy structs at that point, not checked per value.
 - `Utf8StringCache` (`FeatureLoom.Core/Collections/`) dedupes recurring string values; usable globally or per member.
+- Unknown `object` arrays can be converted to a common typed array. `SetCastObjectArrayToCommonTypeArray` overrides this behavior per type/member and through recursive settings; the decision is baked into the prepared `object` reader.
+- `SetAllowUninitializedObjectCreation` can override constructor-free creation per type/member. It remains restricted to `PublicAndPrivateFields` and is intentionally not recursive because it changes object-construction safety across an entire subtree.
 
 ## Deserializer multi-option mappings
 - `AddInstanceTypeMappingOption<TMap>()` keeps field-name inference. Its overload with `<TMap,TField>(fieldName, predicate, configure)` adds an option-local typed field checker: true selects immediately, false/unreadable excludes that option, and an absent field leaves it eligible for inference.
