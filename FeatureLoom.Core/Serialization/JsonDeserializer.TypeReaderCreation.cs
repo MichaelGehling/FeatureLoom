@@ -1397,10 +1397,12 @@ public sealed partial class JsonDeserializer
             }
 
             // Try another quick check at the next index, because there might be a single field missing
-            (name, fieldWriter) = itemFieldWriters[expectedFieldIndex + 1];
+            int nextExpectedFieldIndex = expectedFieldIndex + 1;
+            if (nextExpectedFieldIndex >= writerCount) nextExpectedFieldIndex = 0;
+            (name, fieldWriter) = itemFieldWriters[nextExpectedFieldIndex];
             if (name == fieldName)
             {
-                expectedFieldIndex += 2;
+                expectedFieldIndex = nextExpectedFieldIndex + 1;
                 if (expectedFieldIndex >= writerCount) expectedFieldIndex = 0;
                 return true;
             }
