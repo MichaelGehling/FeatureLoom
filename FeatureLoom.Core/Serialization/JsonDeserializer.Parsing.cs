@@ -1100,8 +1100,12 @@ public sealed partial class JsonDeserializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private object ReadNullValue()
+        => ReadNullValue(false);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private object ReadNullValue(bool whitespaceAlreadySkipped)
     {
-        byte b = SkipWhiteSpaces();
+        byte b = whitespaceAlreadySkipped ? buffer.CurrentByte : SkipWhiteSpaces();
         if (FoldAsciiToLower(b) != (byte)'n') throw new Exception("Failed reading null");
 
 #if NETSTANDARD2_0
@@ -1135,8 +1139,12 @@ public sealed partial class JsonDeserializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool ReadBoolValue()
+        => ReadBoolValue(false);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool ReadBoolValue(bool whitespaceAlreadySkipped)
     {
-        byte b = FoldAsciiToLower(SkipWhiteSpaces());
+        byte b = FoldAsciiToLower(whitespaceAlreadySkipped ? buffer.CurrentByte : SkipWhiteSpaces());
 
         if (b == (byte)'t')
         {
@@ -1883,7 +1891,7 @@ public sealed partial class JsonDeserializer
     {
         SkipWhiteSpaces();
         var rec = buffer.StartRecording();
-        SkipValue();
+        SkipValue(true);
         var utf8Bytes = rec.GetRecordedBytes(buffer.IsBufferReadToEnd);
         JsonFragment fragment = new JsonFragment(utf8Bytes);
         return fragment;
@@ -1897,9 +1905,12 @@ public sealed partial class JsonDeserializer
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    void SkipValue()
+    void SkipValue() => SkipValue(false);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void SkipValue(bool whitespaceAlreadySkipped)
     {
-        byte b = SkipWhiteSpaces();
+        byte b = whitespaceAlreadySkipped ? buffer.CurrentByte : SkipWhiteSpaces();
 
         var valueType = Lookup(map_TypeStart, b);
         switch (valueType)
@@ -1923,13 +1934,13 @@ public sealed partial class JsonDeserializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SkipArray()
     {
-        byte b = SkipWhiteSpaces();
+        byte b = buffer.CurrentByte;
         if (b != '[') throw new Exception("Failed reading array");
         if (!buffer.TryNextByte()) throw new Exception("Failed reading array");
         b = SkipWhiteSpaces();
         while (b != ']')
         {
-            SkipValue();
+            SkipValue(true);
             b = SkipWhiteSpaces();
             if (b == ',')
             {
@@ -1945,19 +1956,19 @@ public sealed partial class JsonDeserializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SkipNull()
     {
-        ReadNullValue();
+        ReadNullValue(true);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SkipBool()
     {
-        _ = ReadBoolValue();
+        _ = ReadBoolValue(true);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SkipObject()
     {
-        byte b = SkipWhiteSpaces();
+        byte b = buffer.CurrentByte;
         if (b != '{') throw new Exception("Failed reading object");
         buffer.TryNextByte();
 
@@ -1966,11 +1977,12 @@ public sealed partial class JsonDeserializer
             b = SkipWhiteSpaces();
             if (b == '}') break;
 
-            var fieldName = ReadStringBytes();
+            SkipString();
             b = SkipWhiteSpaces();
             if (b != ':') throw new Exception("Failed reading object");
             buffer.TryNextByte();
-            SkipValue();
+            b = SkipWhiteSpaces();
+            SkipValue(true);
             b = SkipWhiteSpaces();
             if (b == ',') buffer.TryNextByte();
         }
@@ -1981,7 +1993,67 @@ public sealed partial class JsonDeserializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SkipString()
     {
-        _ = ReadStringBytes();
+        if (buffer.CurrentByte != (byte)'"') ThrowMissingStartQuote();
+
+#if NET5_0_OR_GREATER
+        if (buffer.TryReadSimpleStringBytes(out _)) return;
+#endif
+
+        SkipStringSlow();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void SkipStringSlow()
+    {
+#if NET5_0_OR_GREATER
+        if (!buffer.TryNextByte()) ThrowMissingEndQuote();
+
+        while (true)
+        {
+            ReadOnlySpan<byte> remaining = buffer.GetRemainingSpan();
+            int specialIndex = remaining.IndexOfAny((byte)'"', (byte)'\\');
+
+            if (specialIndex < 0)
+            {
+                int jump = remaining.Length - 1;
+                if (jump > 0) buffer.TrySkipBytes(jump);
+                if (!buffer.TryNextByte()) ThrowMissingEndQuote();
+                continue;
+            }
+
+            if (specialIndex > 0) buffer.TrySkipBytes(specialIndex);
+
+            if (remaining[specialIndex] == (byte)'"')
+            {
+                buffer.TryNextByte();
+                return;
+            }
+
+            if (remaining.Length - specialIndex > 2)
+            {
+                buffer.TrySkipBytes(2);
+                continue;
+            }
+
+            if (!buffer.TryNextByte()) ThrowIncompleteEscapeSequence();
+            if (!buffer.TryNextByte()) ThrowMissingEndQuote();
+        }
+#else
+        byte b;
+        while (buffer.TryNextByte())
+        {
+            b = buffer.CurrentByte;
+            if ((b & 0b10000000) == 0 && b != (byte)'"' && b != (byte)'\\') continue;
+            if (b == (byte)'"')
+            {
+                buffer.TryNextByte();
+                return;
+            }
+            else if (!HandleSpecialChars(b)) ThrowInvalidCharacter();
+        }
+
+        ThrowMissingEndQuote();
+#endif
     }
 
     /// <summary>
@@ -2639,8 +2711,12 @@ public sealed partial class JsonDeserializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     ByteSegment ReadStringBytes()
+        => ReadStringBytes(false);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    ByteSegment ReadStringBytes(bool whitespaceAlreadySkipped)
     {
-        byte b = SkipWhiteSpaces();
+        byte b = whitespaceAlreadySkipped ? buffer.CurrentByte : SkipWhiteSpaces();
         if (b != (byte)'"') ThrowMissingStartQuote();
 
 #if NET5_0_OR_GREATER
@@ -2732,9 +2808,13 @@ public sealed partial class JsonDeserializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     bool TryReadStringBytes(out ByteSegment stringBytes)
+        => TryReadStringBytes(false, out stringBytes);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    bool TryReadStringBytes(bool whitespaceAlreadySkipped, out ByteSegment stringBytes)
     {
         stringBytes = default;
-        byte b = SkipWhiteSpaces();
+        byte b = whitespaceAlreadySkipped ? buffer.CurrentByte : SkipWhiteSpaces();
 
         if (b != (byte)'"') return false;
 
@@ -2980,7 +3060,7 @@ public sealed partial class JsonDeserializer
             b = SkipWhiteSpaces();
             if (b == '}') break;
 
-            ReadStringBytes();
+            ReadStringBytes(true);
             b = SkipWhiteSpaces();
             if (b != ':') throw new Exception("Failed skipping object: expected ':' after field name");
             buffer.TryNextByte();
@@ -3001,7 +3081,7 @@ public sealed partial class JsonDeserializer
             b = SkipWhiteSpaces();
             if (b == '}') break;
 
-            if (!TryReadStringBytes(out var _)) return false;
+            if (!TryReadStringBytes(true, out var _)) return false;
             b = SkipWhiteSpaces();
             if (b != ':') return false;
             buffer.TryNextByte();

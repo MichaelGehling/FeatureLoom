@@ -155,7 +155,7 @@ public sealed partial class JsonDeserializer
         {
             deserializer.SkipWhiteSpaces();
             var rec = deserializer.buffer.StartRecording();            
-            deserializer.SkipValue();
+            deserializer.SkipValue(true);
             utf8Bytes = rec.GetRecordedBytes(deserializer.buffer.IsBufferReadToEnd);
         }
 
@@ -166,7 +166,7 @@ public sealed partial class JsonDeserializer
             {
                 try
                 {
-                    deserializer.SkipValue();
+                    deserializer.SkipValue(true);
                     utf8Bytes = undoHandle.GetReadBytes();
                     undoHandle.SetUndoReading(false);
                     return true;

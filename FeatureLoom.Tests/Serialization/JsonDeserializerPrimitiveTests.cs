@@ -296,6 +296,18 @@ namespace FeatureLoom.Serialization
         }
 
         [Theory]
+        [InlineData("\"escaped \\\"value\\\" and \\\\ slash\"")]
+        [InlineData("-1234567890.123456789e-42")]
+        [InlineData("true")]
+        [InlineData("null")]
+        [InlineData("[\"alpha\",-123.456e7,true,null,{\"nested\":[1,2,3,false]}]")]
+        [InlineData("{\"text\":\"alpha\",\"number\":-123.456e7,\"bool\":true,\"nil\":null,\"array\":[1,2,3],\"object\":{\"nested\":false}}")]
+        public void Deserialize_JsonFragment_RepresentativeValueShapes(string json)
+        {
+            AssertDeserialized(json, new JsonFragment(json));
+        }
+
+        [Theory]
         [InlineData("null", null)]
         [InlineData("-128", (sbyte)-128)]
         [InlineData("127", (sbyte)127)]
