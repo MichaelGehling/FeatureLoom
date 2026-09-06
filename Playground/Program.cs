@@ -238,5 +238,16 @@ namespace Playground
             public Sample sample;
         }
 
+        public class NodeId
+        {
+            ushort namespaceIndex;
+        }
+
+        private static void Main(string[] args)
+        {
+            string json = "{\"namespaceIndex\":7}";
+            JsonDeserializer jsonDeserializer = new JsonDeserializer();
+            jsonDeserializer.TryDeserialize(json, typeof(NodeId), out object result);
+        }
     }
 }
