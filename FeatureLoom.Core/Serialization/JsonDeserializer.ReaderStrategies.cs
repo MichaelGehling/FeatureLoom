@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using static FeatureLoom.Serialization.JsonDeserializer;
 
@@ -185,6 +186,71 @@ public partial class JsonDeserializer
         return TypeReaderInitializer.Create(this, stringArrayReader, null, cachedTypeReader.WriteRefPath, cachedTypeReader.TypeSettings);
     }
 
+    string[] stringCollectionScratch;
+
+    private string[] ReadStringsIntoScratch(bool withStringCache, out int count)
+    {
+        byte b = buffer.CurrentByte;
+        if (b != '[') throw new Exception($"Failed reading Array: Array didn't start with '[', but with '{(char)b}'");
+        if (!buffer.TryNextByte()) throw new Exception("Failed reading Array: Unexpected end of input");
+
+        string[] target = stringCollectionScratch ?? new string[16];
+        count = 0;
+        while (true)
+        {
+            b = SkipWhiteSpaces();
+            if (b == ']') break;
+            if (count == target.Length) Array.Resize(ref target, target.Length * 2);
+            target[count++] = withStringCache
+                ? ReadStringValueOrNull_WithStringCache(true)
+                : ReadStringValueOrNull_WithoutStringCache(true);
+            b = SkipWhiteSpaces();
+            if (b == ',') buffer.TryNextByte();
+            else if (b != ']') throw new Exception($"Failed reading Array: Unexpected character encountered '{(char)b}'");
+        }
+
+        stringCollectionScratch = target;
+        buffer.TryNextByte();
+        return target;
+    }
+
+    private TypeReaderInitializer CreateStringArrayTypeReader(bool withStringCache, CachedTypeReader cachedTypeReader)
+    {
+        bool setItemRef = cachedTypeReader.ResolveRefs;
+        var reader = () =>
+        {
+            if (TryReadNullValue()) return default;
+            string[] target = ReadStringsIntoScratch(withStringCache, out int count);
+            var item = new string[count];
+            Array.Copy(target, item, count);
+            Array.Clear(target, 0, count);
+            if (setItemRef) SetRefInCurrentItemInfo(item);
+            return item;
+        };
+        return TypeReaderInitializer.Create(this, reader, null, cachedTypeReader.WriteRefPath, cachedTypeReader.TypeSettings);
+    }
+
+    private TypeReaderInitializer CreateStringListTypeReader(bool withStringCache, CachedTypeReader cachedTypeReader)
+    {
+        bool setItemRef = cachedTypeReader.ResolveRefs;
+        var reader = () =>
+        {
+            if (TryReadNullValue()) return default;
+            string[] target = ReadStringsIntoScratch(withStringCache, out int count);
+            var item = new List<string>(count);
+#if NET8_0_OR_GREATER
+            CollectionsMarshal.SetCount(item, count);
+            target.AsSpan(0, count).CopyTo(CollectionsMarshal.AsSpan(item));
+#else
+            for (int i = 0; i < count; i++) item.Add(target[i]);
+#endif
+            Array.Clear(target, 0, count);
+            if (setItemRef) SetRefInCurrentItemInfo(item);
+            return item;
+        };
+        return TypeReaderInitializer.Create(this, reader, null, cachedTypeReader.WriteRefPath, cachedTypeReader.TypeSettings);
+    }
+
 
     interface IReaderStrategy<TValue>
     {
@@ -232,6 +298,26 @@ public partial class JsonDeserializer
         public static string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithStringCache();
 #else
         public string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithStringCache();
+#endif
+    }
+
+    struct StringCollectionReader_WithoutStringCache_Strategy : IReaderStrategy<string>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithoutStringCache(true);
+#else
+        public string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithoutStringCache(true);
+#endif
+    }
+
+    struct StringCollectionReader_WithStringCache_Strategy : IReaderStrategy<string>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET5_0_OR_GREATER
+        public static string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithStringCache(true);
+#else
+        public string Read(CachedTypeReader reader) => reader.Parent.ReadStringValueOrNull_WithStringCache(true);
 #endif
     }
 

@@ -258,10 +258,14 @@ public sealed partial class JsonDeserializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private string ReadStringValueOrNull_WithoutStringCache()
-    {
-        if (TryReadNullValue()) return null;
+        => ReadStringValueOrNull_WithoutStringCache(false);
 
-        var stringBytes = ReadStringBytes();
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private string ReadStringValueOrNull_WithoutStringCache(bool whitespaceAlreadySkipped)
+    {
+        if (TryReadNullValue(whitespaceAlreadySkipped)) return null;
+
+        var stringBytes = ReadStringBytes(true);
         string result;
 
         result = Utf8Converter.DecodeUtf8ToString(stringBytes, stringBuilder);
@@ -272,9 +276,13 @@ public sealed partial class JsonDeserializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private string ReadStringValueOrNull_WithStringCache()
+        => ReadStringValueOrNull_WithStringCache(false);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private string ReadStringValueOrNull_WithStringCache(bool whitespaceAlreadySkipped)
     {
-        if (TryReadNullValue()) return null;
-        var stringBytes = ReadStringBytes();
+        if (TryReadNullValue(whitespaceAlreadySkipped)) return null;
+        var stringBytes = ReadStringBytes(true);
         string result;
         result = stringCache.GetOrCreate(stringBytes, stringBuilder);
         stringBuilder.Clear();
@@ -1306,8 +1314,12 @@ public sealed partial class JsonDeserializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     bool TryReadNullValue()
+        => TryReadNullValue(false);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    bool TryReadNullValue(bool whitespaceAlreadySkipped)
     {
-        byte b = SkipWhiteSpaces();
+        byte b = whitespaceAlreadySkipped ? buffer.CurrentByte : SkipWhiteSpaces();
         if (FoldAsciiToLower(b) != (byte)'n') return false;
         return TryReadNullValue_Continuation();
     }

@@ -2060,8 +2060,7 @@ public sealed partial class JsonDeserializer
         {
             if (typeof(E) == typeof(string))
             {
-                if (CheckUseStringCache(cachedTypeReader.TypeSettings)) return CreateGenericArrayTypeReaderViaStrategy<E, StringReader_WithStringCache_Strategy, string>(elementTypeReader, pool, cachedTypeReader);
-                else return CreateGenericArrayTypeReaderViaStrategy<E, StringReader_WithoutStringCache_Strategy, string>(elementTypeReader, pool, cachedTypeReader);
+                return CreateStringArrayTypeReader(CheckUseStringCache(cachedTypeReader.TypeSettings), cachedTypeReader);
             }
             if (typeof(E) == typeof(char)) return CreateGenericArrayTypeReaderViaStrategy<E, CharReaderStrategy, char>(elementTypeReader, pool, cachedTypeReader);
             if (typeof(E) == typeof(sbyte)) return CreateGenericArrayTypeReaderViaStrategy<E, SByteReaderStrategy, sbyte>(elementTypeReader, pool, cachedTypeReader);
@@ -2260,8 +2259,9 @@ public sealed partial class JsonDeserializer
         {
             if (typeof(E) == typeof(string))
             {
-                if (CheckUseStringCache(typeSettings)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringReader_WithStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
-                else return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringReader_WithoutStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
+                if (typeof(T) == typeof(List<string>)) return CreateStringListTypeReader(CheckUseStringCache(typeSettings), cachedTypeReader);
+                if (CheckUseStringCache(typeSettings)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringCollectionReader_WithStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
+                else return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringCollectionReader_WithoutStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
             }
             if (typeof(E) == typeof(char)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, CharReaderStrategy, char>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
             if (typeof(E) == typeof(sbyte)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, SByteReaderStrategy, sbyte>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
