@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+#if NET8_0_OR_GREATER
+using System.Runtime.InteropServices;
+#endif
 
 namespace FeatureLoom.Serialization;
 
@@ -518,8 +521,13 @@ public sealed partial class JsonDeserializer
     {
         ReadNumbersIntoScratch<T, TParser>(ref scratch, out int count);
         var result = new List<T>(count);
+#if NET8_0_OR_GREATER
+        CollectionsMarshal.SetCount(result, count);
+        scratch.AsSpan(0, count).CopyTo(CollectionsMarshal.AsSpan(result));
+#else
         T[] source = scratch;
         for (int i = 0; i < count; i++) result.Add(source[i]);
+#endif
         return result;
     }
 

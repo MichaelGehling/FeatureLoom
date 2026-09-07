@@ -1981,7 +1981,7 @@ public sealed partial class JsonDeserializer
             return CreateByteArrayTypeReader(cachedTypeReader);
         }
         else if (!cachedTypeReader.ResolveRefs &&
-                 GetElementSettings(arrayType.GetElementType(), cachedTypeReader.TypeSettings) == null &&
+                 GetElementSettings(arrayType.GetElementType(), cachedTypeReader.TypeSettings) == null &&                 
                  TryCreateNumberContainerReader(arrayType.GetElementType(), false, cachedTypeReader, out var integerInitializer))
         {
             return integerInitializer;
@@ -2107,35 +2107,47 @@ public sealed partial class JsonDeserializer
     }
 
     private bool TryCreateEnumerableTypeReader(Type itemType, CachedTypeReader cachedTypeReader, out TypeReaderInitializer initializer)
-    {        
+    {
+        // Exact List<T> of a supported number type, without reference tracking or a custom collection
+        // constructor: parse in bulk into reusable scratch storage and create the final list with its exact size.
         if (!cachedTypeReader.ResolveRefs && // The bulk reader does not set reference paths
             itemType.IsGenericType && itemType.GetGenericTypeDefinition() == typeof(List<>) &&
+            cachedTypeReader.TypeSettings?.collectionConstructor == null &&
             GetElementSettings(itemType.GetGenericArguments()[0], cachedTypeReader.TypeSettings) == null &&
             TryCreateNumberContainerReader(itemType.GetGenericArguments()[0], true, cachedTypeReader, out initializer))
         {
             return true;
         }
 
+        // Mutable ICollection<T> with reference tracking: construct and register the target before
+        // reading its elements, then add each element directly so self/cyclic references can resolve.
         if (cachedTypeReader.ResolveRefs && // We only do the special handling if required, due to reference resolution
             itemType.TryGetTypeParamsOfGenericInterface(typeof(ICollection<>), out Type elementType) &&
             this.InvokeGenericMethod<bool>(nameof(IsMutableCollectionType), [itemType, elementType], []))
         {
             initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericMutableCollectionTypeReader), [itemType, elementType], cachedTypeReader);
         }
+        // Mutable non-generic IList with reference tracking: same early-registration approach, but
+        // elements are read as object because no generic element type is available.
         else if(cachedTypeReader.ResolveRefs && // We only do the special handling if required, due to reference resolution
             itemType.IsAssignableTo(typeof(IList)) &&            
             this.InvokeGenericMethod<bool>(nameof(IsMutableNonGenericListType), [itemType], []))
         {
             initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateNonGenericMutableListTypeReader), [itemType], cachedTypeReader);
         }
+        // Generic enumerable target: buffer typed elements, then invoke the configured or discovered
+        // IEnumerable<T> constructor. This also covers List<T> when no earlier special path applies.
         else if (itemType.TryGetTypeParamsOfGenericInterface(typeof(IEnumerable<>), out elementType))
         {
             initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericEnumerableTypeReader), [itemType, elementType], cachedTypeReader);
         }
+        // Non-generic enumerable target: buffer object elements, then invoke the configured or
+        // discovered IEnumerable constructor.
         else if (itemType.ImplementsInterface(typeof(IEnumerable)))
         {
             initializer = this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateEnumerableTypeReader), [itemType], cachedTypeReader);
         }
+        // The type is not a supported enumerable target.
         else
         {
             initializer = null;
@@ -2259,7 +2271,7 @@ public sealed partial class JsonDeserializer
         {
             if (typeof(E) == typeof(string))
             {
-                if (typeof(T) == typeof(List<string>)) return CreateStringListTypeReader(CheckUseStringCache(typeSettings), cachedTypeReader);
+                if (typeof(T) == typeof(List<string>) && typeSettings?.collectionConstructor == null) return CreateStringListTypeReader(CheckUseStringCache(typeSettings), cachedTypeReader);
                 if (CheckUseStringCache(typeSettings)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringCollectionReader_WithStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
                 else return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringCollectionReader_WithoutStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
             }

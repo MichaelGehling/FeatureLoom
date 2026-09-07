@@ -138,6 +138,30 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
+        public void Settings_AddCollectionConstructor_ForNumberList_UsesConfiguredConstructor()
+        {
+            var settings = new JsonDeserializer.Settings();
+            settings.ConfigureType<List<int>>(typeSettings => typeSettings.AddCollectionConstructor<int>(values => new List<int>(values) { 42 }));
+
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("[4,5,6]", out List<int> value));
+            Assert.Equal(new[] { 4, 5, 6, 42 }, value);
+        }
+
+        [Fact]
+        public void Settings_AddCollectionConstructor_ForStringList_UsesConfiguredConstructor()
+        {
+            var settings = new JsonDeserializer.Settings();
+            settings.ConfigureType<List<string>>(typeSettings => typeSettings.AddCollectionConstructor<string>(values => new List<string>(values) { "custom" }));
+
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("[\"a\",\"b\"]", out List<string> value));
+            Assert.Equal(new[] { "a", "b", "custom" }, value);
+        }
+
+        [Fact]
         public void Settings_AddCustomTypeReader_UsesCustomReader()
         {
             var settings = new JsonDeserializer.Settings();
