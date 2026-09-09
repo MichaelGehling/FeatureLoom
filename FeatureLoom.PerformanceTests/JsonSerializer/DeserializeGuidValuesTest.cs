@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using FeatureLoom.Serialization;
 using System;
 using System.Collections.Generic;
@@ -14,8 +15,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class DeserializeGuidValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
@@ -51,14 +54,9 @@ public class DeserializeGuidValuesTest
         SampleOutput.Collect($"Guid({guidCase})", value, featureJsonSerializer, systemTextJsonSerializerSettings);
     }
 
-    [IterationSetup]
-    public void Prepare()
-    {
-        featureStream_Single.Position = 0;
-        featureStream_Array.Position = 0;
-    }
 
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeGuid_Single_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -68,7 +66,8 @@ public class DeserializeGuidValuesTest
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Single")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeGuid_Single_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -79,7 +78,8 @@ public class DeserializeGuidValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeGuid_Single_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -90,7 +90,8 @@ public class DeserializeGuidValuesTest
     }
 #endif
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeGuid_Array_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -100,7 +101,8 @@ public class DeserializeGuidValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeGuid_Array_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -111,7 +113,8 @@ public class DeserializeGuidValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeGuid_Array_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)

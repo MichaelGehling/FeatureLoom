@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using FeatureLoom.Serialization;
 using System.IO;
 using System.Text.Json;
@@ -14,8 +15,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class DeserializeSimpleObjectTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
@@ -47,14 +50,9 @@ public class DeserializeSimpleObjectTest
         SampleOutput.Collect("SimpleObject", single, featureJsonSerializer, systemTextJsonSerializerSettings);
     }
 
-    [IterationSetup]
-    public void Prepare()
-    {
-        featureStream_Single.Position = 0;
-        featureStream_Array.Position = 0;
-    }
 
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeSimpleObject_Single_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -64,7 +62,8 @@ public class DeserializeSimpleObjectTest
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Single")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeSimpleObject_Single_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -75,7 +74,8 @@ public class DeserializeSimpleObjectTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeSimpleObject_Single_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -86,7 +86,8 @@ public class DeserializeSimpleObjectTest
     }
 #endif
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeSimpleObject_Array_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -96,7 +97,8 @@ public class DeserializeSimpleObjectTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeSimpleObject_Array_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -107,7 +109,8 @@ public class DeserializeSimpleObjectTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeSimpleObject_Array_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)

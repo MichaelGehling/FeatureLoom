@@ -1,4 +1,5 @@
-using BenchmarkDotNet.Attributes;
+﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using FeatureLoom.Serialization;
 using System.IO;
 using System.Text.Json;
@@ -18,8 +19,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class DeserializeComplexObjectTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
@@ -75,18 +78,8 @@ public class DeserializeComplexObjectTest
         SampleOutput.Collect("ComplexObject", single, featureJsonSerializer, systemTextJsonSerializerSettings);
     }
 
-    [IterationSetup]
-    public void Prepare()
-    {
-        featureStream_Single.Position = 0;
-        featureStream_Array.Position = 0;
-#if NET6_0_OR_GREATER
-        spanJsonStream_Single.Position = 0;
-        spanJsonStream_Array.Position = 0;
-#endif
-    }
-
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeComplexObject_Single_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -96,7 +89,8 @@ public class DeserializeComplexObjectTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeComplexObject_Single_Feature_NoStringCache()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -106,7 +100,8 @@ public class DeserializeComplexObjectTest
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Single")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeComplexObject_Single_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -116,7 +111,8 @@ public class DeserializeComplexObjectTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeComplexObject_Single_SystemTextSourceGen()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -127,7 +123,8 @@ public class DeserializeComplexObjectTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeComplexObject_Single_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -138,7 +135,8 @@ public class DeserializeComplexObjectTest
     }
 #endif
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeComplexObject_Array_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -148,7 +146,8 @@ public class DeserializeComplexObjectTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeComplexObject_Array_Feature_NoStringCache()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -158,7 +157,8 @@ public class DeserializeComplexObjectTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeComplexObject_Array_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -168,7 +168,8 @@ public class DeserializeComplexObjectTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeComplexObject_Array_SystemTextSourceGen()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -179,7 +180,8 @@ public class DeserializeComplexObjectTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeComplexObject_Array_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)

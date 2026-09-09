@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,8 +17,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class SerializeDecimalValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
@@ -52,24 +55,22 @@ public class SerializeDecimalValuesTest
         SampleOutput.Collect($"Decimal({value})", value, featureJsonSerializer, systemTextJsonSerializerSettings);
     }
 
-    [IterationSetup]
-    public void Prepare()
-    {
-        memoryStream.Position = 0;
-    }
-
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeDecimal_Single_Feature()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, value);
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Single")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeDecimal_Single_SystemText()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, value, systemTextJsonSerializerSettings);
@@ -77,9 +78,11 @@ public class SerializeDecimalValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeDecimal_Single_SpanJson()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             // SpanJson only offers an async stream API. The MemoryStream completes synchronously,
@@ -89,18 +92,22 @@ public class SerializeDecimalValuesTest
     }
 #endif
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void SerializeDecimal_Array_Feature()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, array);
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void SerializeDecimal_Array_SystemText()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
@@ -108,9 +115,11 @@ public class SerializeDecimalValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void SerializeDecimal_Array_SpanJson()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
         {
             SerializerConfigs.SerializeWithSpanJson(array, memoryStream);

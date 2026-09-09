@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using FeatureLoom.Serialization;
 using System.IO;
 using System.Text.Json;
@@ -18,8 +19,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(200)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class DeserializeByteArrayValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
@@ -70,20 +73,9 @@ public class DeserializeByteArrayValuesTest
         SampleOutput.Collect($"ByteArray({size},Numbers)", value, featureJsonSerializerNumbers, systemTextJsonSerializerSettingsNumbers, maxLength: 200);
     }
 
-    [IterationSetup]
-    public void Prepare()
-    {
-        base64Stream_Single.Position = 0;
-        base64Stream_Array.Position = 0;
-        numbersStream_Single.Position = 0;
-        numbersStream_Array.Position = 0;
-#if NET6_0_OR_GREATER
-        spanJsonStream_Single.Position = 0;
-        spanJsonStream_Array.Position = 0;
-#endif
-    }
 
-    [Benchmark]
+    [BenchmarkCategory("Single-Base64")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeByteArray_Single_Base64_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -93,7 +85,8 @@ public class DeserializeByteArrayValuesTest
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Single-Base64")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeByteArray_Single_Base64_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -103,7 +96,8 @@ public class DeserializeByteArrayValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Single-Numbers")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeByteArray_Single_Numbers_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -113,7 +107,8 @@ public class DeserializeByteArrayValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Single-Numbers")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeByteArray_Single_Numbers_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -124,7 +119,8 @@ public class DeserializeByteArrayValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Single-Numbers")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeByteArray_Single_Numbers_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -135,7 +131,11 @@ public class DeserializeByteArrayValuesTest
     }
 #endif
 
-    [Benchmark]
+    // arrayIterations depends on the size parameter and therefore cannot be used in an attribute.
+    // Since arrayIterations * outerSize is constant, the operation count is expressed as the total
+    // number of byte arrays processed per invocation, which is identical for all sizes.
+    [BenchmarkCategory("Array-Base64")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void DeserializeByteArray_Array_Base64_Feature()
     {
         for (int i = 0; i < arrayIterations; i++)
@@ -145,7 +145,8 @@ public class DeserializeByteArrayValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array-Base64")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void DeserializeByteArray_Array_Base64_SystemText()
     {
         for (int i = 0; i < arrayIterations; i++)
@@ -155,7 +156,8 @@ public class DeserializeByteArrayValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array-Numbers")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void DeserializeByteArray_Array_Numbers_Feature()
     {
         for (int i = 0; i < arrayIterations; i++)
@@ -165,7 +167,8 @@ public class DeserializeByteArrayValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array-Numbers")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void DeserializeByteArray_Array_Numbers_SystemText()
     {
         for (int i = 0; i < arrayIterations; i++)
@@ -176,7 +179,8 @@ public class DeserializeByteArrayValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Array-Numbers")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void DeserializeByteArray_Array_Numbers_SpanJson()
     {
         for (int i = 0; i < arrayIterations; i++)

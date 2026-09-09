@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using FeatureLoom.Serialization;
 using System;
 using System.Collections.Generic;
@@ -15,8 +16,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class DeserializeDateTimeValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
@@ -63,14 +66,9 @@ public class DeserializeDateTimeValuesTest
         SampleOutput.Collect($"DateTime({dateTimeCase})", value, featureJsonSerializer, systemTextJsonSerializerSettings);
     }
 
-    [IterationSetup]
-    public void Prepare()
-    {
-        featureStream_Single.Position = 0;
-        featureStream_Array.Position = 0;
-    }
 
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeDateTime_Single_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -80,7 +78,8 @@ public class DeserializeDateTimeValuesTest
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Single")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeDateTime_Single_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -91,7 +90,8 @@ public class DeserializeDateTimeValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeDateTime_Single_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -102,7 +102,8 @@ public class DeserializeDateTimeValuesTest
     }
 #endif
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = ArrayIterations)]
     public void DeserializeDateTime_Array_Feature()
     {
         for (int i = 0; i < ArrayIterations; i++)
@@ -112,7 +113,8 @@ public class DeserializeDateTimeValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = ArrayIterations)]
     public void DeserializeDateTime_Array_SystemText()
     {
         for (int i = 0; i < ArrayIterations; i++)
@@ -123,7 +125,8 @@ public class DeserializeDateTimeValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = ArrayIterations)]
     public void DeserializeDateTime_Array_SpanJson()
     {
         for (int i = 0; i < ArrayIterations; i++)

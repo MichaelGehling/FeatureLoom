@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using System.IO;
 using System.Text.Json;
@@ -19,8 +20,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [SimpleJob(RuntimeMoniker.Net10_0)]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 [CPUUsageDiagnoser]
 public class SerializeNullableMembersTest
 {
@@ -47,7 +50,8 @@ public class SerializeNullableMembersTest
             array[i] = new NullableObject();
     }
 
-    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeNullableMembers_Single_Feature()
     {
         memoryStream.Position = 0;
@@ -57,7 +61,8 @@ public class SerializeNullableMembersTest
         }
     }
 
-    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
+    [BenchmarkCategory("Single")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeNullableMembers_Single_SystemText()
     {
         memoryStream.Position = 0;
@@ -67,17 +72,25 @@ public class SerializeNullableMembersTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void SerializeNullableMembers_Array_Feature()
     {
         memoryStream.Position = 0;
-        featureJsonSerializer.Serialize(memoryStream, array);
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            featureJsonSerializer.Serialize(memoryStream, array);
+        }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void SerializeNullableMembers_Array_SystemText()
     {
         memoryStream.Position = 0;
-        System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
+        for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
+        {
+            System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
+        }
     }
 }

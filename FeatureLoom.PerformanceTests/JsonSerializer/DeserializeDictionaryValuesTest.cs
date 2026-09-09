@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using FeatureLoom.Serialization;
 using System;
 using System.Collections.Generic;
@@ -14,8 +15,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class DeserializeDictionaryValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
@@ -139,14 +142,9 @@ public class DeserializeDictionaryValuesTest
         return dict;
     }
 
-    [IterationSetup]
-    public void Prepare()
-    {
-        singleStream.Position = 0;
-        arrayStream.Position = 0;
-    }
 
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeDictionary_Single_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -156,7 +154,8 @@ public class DeserializeDictionaryValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeDictionary_Single_Feature_NoStringCache()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -166,7 +165,8 @@ public class DeserializeDictionaryValuesTest
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Single")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeDictionary_Single_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -177,7 +177,8 @@ public class DeserializeDictionaryValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Single")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void DeserializeDictionary_Single_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
@@ -188,7 +189,8 @@ public class DeserializeDictionaryValuesTest
     }
 #endif
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeDictionary_Array_Feature()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -198,7 +200,8 @@ public class DeserializeDictionaryValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeDictionary_Array_Feature_NoStringCache()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -208,7 +211,8 @@ public class DeserializeDictionaryValuesTest
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeDictionary_Array_SystemText()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)
@@ -219,7 +223,8 @@ public class DeserializeDictionaryValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Array")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArrayIterations)]
     public void DeserializeDictionary_Array_SpanJson()
     {
         for (int i = 0; i < BenchmarkSettings.ArrayIterations; i++)

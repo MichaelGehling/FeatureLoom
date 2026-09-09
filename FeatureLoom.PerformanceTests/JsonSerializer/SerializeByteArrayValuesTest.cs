@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -23,8 +24,10 @@ namespace FeatureLoom.PerformanceTests.JsonSerializer;
 [MemoryDiagnoser]
 [CsvMeasurementsExporter]
 [HtmlExporter]
-[MinIterationCount(500)]
-[MaxIterationCount(5000)]
+[MinIterationCount(25)]
+[MaxIterationCount(100)]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class SerializeByteArrayValuesTest
 {
     static Serialization.JsonSerializer featureJsonSerializer = SerializerConfigs.CreateFeatureSerializer();
@@ -65,42 +68,44 @@ public class SerializeByteArrayValuesTest
         SampleOutput.Collect($"ByteArray({size},Numbers)", value, featureJsonSerializerNumbers, systemTextJsonSerializerSettingsNumbers, maxLength: 200);
     }
 
-    [IterationSetup]
-    public void Prepare()
-    {
-        memoryStream.Position = 0;
-    }
-
-    [Benchmark]
+    [BenchmarkCategory("Single-Base64")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeByteArray_Single_Base64_Feature()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, value);
         }
     }
 
-    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("Single-Base64")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeByteArray_Single_Base64_SystemText()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, value, systemTextJsonSerializerSettings);
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Single-Numbers")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeByteArray_Single_Numbers_Feature()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             featureJsonSerializerNumbers.Serialize(memoryStream, value);
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Single-Numbers")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeByteArray_Single_Numbers_SystemText()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, value, systemTextJsonSerializerSettingsNumbers);
@@ -108,9 +113,11 @@ public class SerializeByteArrayValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Single-Numbers")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.Iterations)]
     public void SerializeByteArray_Single_Numbers_SpanJson()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < BenchmarkSettings.Iterations; i++)
         {
             // SpanJson only offers an async stream API. The MemoryStream completes synchronously,
@@ -120,36 +127,47 @@ public class SerializeByteArrayValuesTest
     }
 #endif
 
-    [Benchmark]
+    // arrayIterations depends on the size parameter and therefore cannot be used in an attribute.
+    // Since arrayIterations * outerSize is constant, the operation count is expressed as the total
+    // number of byte arrays processed per invocation, which is identical for all sizes.
+    [BenchmarkCategory("Array-Base64")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void SerializeByteArray_Array_Base64_Feature()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < arrayIterations; i++)
         {
             featureJsonSerializer.Serialize(memoryStream, array);
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array-Base64")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void SerializeByteArray_Array_Base64_SystemText()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < arrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettings);
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array-Numbers")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void SerializeByteArray_Array_Numbers_Feature()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < arrayIterations; i++)
         {
             featureJsonSerializerNumbers.Serialize(memoryStream, array);
         }
     }
 
-    [Benchmark]
+    [BenchmarkCategory("Array-Numbers")]
+    [Benchmark(Baseline = true, OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void SerializeByteArray_Array_Numbers_SystemText()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < arrayIterations; i++)
         {
             System.Text.Json.JsonSerializer.Serialize(memoryStream, array, systemTextJsonSerializerSettingsNumbers);
@@ -157,9 +175,11 @@ public class SerializeByteArrayValuesTest
     }
 
 #if NET6_0_OR_GREATER
-    [Benchmark]
+    [BenchmarkCategory("Array-Numbers")]
+    [Benchmark(OperationsPerInvoke = BenchmarkSettings.ArraySize * BenchmarkSettings.ArrayIterations)]
     public void SerializeByteArray_Array_Numbers_SpanJson()
     {
+        memoryStream.Position = 0;
         for (int i = 0; i < arrayIterations; i++)
         {
             SerializerConfigs.SerializeWithSpanJson(array, memoryStream);
