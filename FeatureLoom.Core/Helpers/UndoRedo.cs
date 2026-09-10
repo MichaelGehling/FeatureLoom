@@ -135,12 +135,21 @@ public class UndoRedo
         }
 
         /// <summary>
-        /// Executes the action synchronously. If the action is async, it will be awaited blocking the current thread.
+        /// Executes the action synchronously. If the action is async, it will be awaited blocking the current thread,
+        /// with the current <see cref="SynchronizationContext"/> suspended around the invocation to avoid a deadlock.
+        /// The calling thread's context is restored again as soon as the call returns; only the action's own
+        /// continuations are affected: they resume on thread pool threads, not on the calling context.
         /// </summary>
         public void Execute()
         {
             if (action is Action syncAction) syncAction();
-            else if (action is Func<Task> asyncAction) asyncAction().WaitFor();
+            // The context is suspended around the INVOCATION, because the async action captures
+            // SynchronizationContext.Current at its first await. Blocking afterwards on a
+            // context-bound thread (e.g. a UI thread) would otherwise deadlock.
+            else if (action is Func<Task> asyncAction)
+            {
+                using (System.Threading.SynchronizationContext.Current.Suspend()) asyncAction().WaitFor();
+            }
         }
 
         /// <summary>
@@ -304,6 +313,12 @@ public class UndoRedo
     /// Performs the most recent undo action, if available.
     /// The corresponding redo action is automatically added to the redo stack.
     /// </summary>
+    /// <remarks>
+    /// If the action was registered as asynchronous, it is invoked with the current
+    /// <see cref="SynchronizationContext"/> suspended and awaited blocking, so its continuations run on
+    /// thread pool threads instead of the calling context. The calling thread's context is restored when
+    /// this method returns. See <see cref="AddUndo(Func{Task}, string)"/>.
+    /// </remarks>
     public void PerformUndo()
     {
         if (undos.Count == 0) return;
@@ -355,6 +370,12 @@ public class UndoRedo
     /// Performs the most recent redo action, if available.
     /// The corresponding undo action is automatically added back to the undo stack.
     /// </summary>
+    /// <remarks>
+    /// If the action was registered as asynchronous, it is invoked with the current
+    /// <see cref="SynchronizationContext"/> suspended and awaited blocking, so its continuations run on
+    /// thread pool threads instead of the calling context. The calling thread's context is restored when
+    /// this method returns. See <see cref="AddUndo(Func{Task}, string)"/>.
+    /// </remarks>
     public void PerformRedo()
     {
         if (redos.Count == 0) return;
@@ -438,6 +459,17 @@ public class UndoRedo
     /// </summary>
     /// <param name="undo">The asynchronous action that will reverse a change.</param>
     /// <param name="description">An optional description of what this action undoes.</param>
+    /// <remarks>
+    /// IMPORTANT: If the action is later executed via the synchronous <see cref="PerformUndo"/> /
+    /// <see cref="PerformRedo"/>, it is invoked with the current <see cref="SynchronizationContext"/>
+    /// suspended and is then awaited blocking. This is required to avoid a deadlock, but it means the
+    /// action's continuations do NOT resume on the calling thread's context: they run on thread pool
+    /// threads. So an async undo action must not touch context-affine state (e.g. UI controls or
+    /// view models) after an await unless it marshals back explicitly.
+    /// The suspension only affects the action itself; the calling thread's context is restored as soon as
+    /// the synchronous call returns.
+    /// Use <see cref="PerformUndoAsync"/> / <see cref="PerformRedoAsync"/> to keep the context.
+    /// </remarks>
     public void AddUndo(Func<Task> undo, string description = null)
     {
         using (myLock.LockReentrant())
@@ -491,6 +523,12 @@ public class UndoRedo
     /// <param name="undoAction">The asynchronous action that will undo the `doAction`.</param>
     /// <param name="description">An optional description for the undo action.</param>
     /// <returns>A task that completes when the `doAction` has finished.</returns>
+    /// <remarks>
+    /// The registered undo action is asynchronous. If it is later executed via the synchronous
+    /// <see cref="PerformUndo"/> / <see cref="PerformRedo"/>, the synchronization context is suspended
+    /// around it (see <see cref="AddUndo(Func{Task}, string)"/>), so `doAction` and `undoAction` must not
+    /// touch context-affine state after an await.
+    /// </remarks>
     public async Task DoWithUndoAsync(Func<Task> doAction, Func<Task> undoAction, string description = null)
     {
         await doAction().ConfiguredAwait();

@@ -222,12 +222,14 @@ namespace FeatureLoom.MessageFlow
 
         public void Post<M>(in M message)
         {
-            PostAsync(message).WaitFor();
+            // Suspending around the invocation prevents a sync-over-async deadlock when Post is
+            // called from a context-bound thread; PostAsync captures the context at its first await.
+            using (SynchronizationContext.Current.Suspend()) PostAsync(message).WaitFor();
         }
 
         public void Post<M>(M message)
         {
-            PostAsync(message).WaitFor();
+            using (SynchronizationContext.Current.Suspend()) PostAsync(message).WaitFor();
         }
 
         public async Task PostAsync<M>(M message)

@@ -711,4 +711,85 @@ public class AsyncManualResetEventTests
     }
 
     #endregion
+
+    #region Wakeup correctness
+
+    [Fact]
+    public void Wait_WithCancellationToken_ReturnsFalseWhenCancelledWhileWaiting()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+        mre.YieldCyclesForSyncWait = 0;
+        using var cts = new CancellationTokenSource();
+        bool? result = null;
+
+        var waiter = Task.Run(() => result = mre.Wait(cts.Token));
+        Thread.Sleep(50);
+        cts.Cancel();
+
+        Assert.True(waiter.Wait(5.Seconds()));
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void Wait_IsNotWokenUpByAnotherWaitersCancellation()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+        mre.YieldCyclesForSyncWait = 0;
+        using var cts = new CancellationTokenSource();
+
+        // A cancelled waiter pulses the shared monitor. An unrelated waiter must not
+        // interpret that wakeup as "the event was set".
+        var cancelledWaiter = Task.Run(() => mre.Wait(cts.Token));
+        var plainWaiter = Task.Run(() => mre.Wait(500.Milliseconds()));
+        Thread.Sleep(50);
+        cts.Cancel();
+
+        Assert.True(cancelledWaiter.Wait(5.Seconds()));
+        Assert.True(plainWaiter.Wait(5.Seconds()));
+        Assert.False(plainWaiter.Result);
+
+        mre.Set();
+    }
+
+    [Fact]
+    public void Wait_WithTimeoutAndCancellation_ReturnsFalseWhenCancelledWhileWaiting()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+        mre.YieldCyclesForSyncWait = 0;
+        using var cts = new CancellationTokenSource();
+        bool? result = null;
+
+        var waiter = Task.Run(() => result = mre.Wait(30.Seconds(), cts.Token));
+        Thread.Sleep(50);
+        cts.Cancel();
+
+        Assert.True(waiter.Wait(5.Seconds()));
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void TryConvertToWaitHandle_ReflectsSetAndResetState()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var mre = new AsyncManualResetEvent(false);
+        Assert.True(mre.TryConvertToWaitHandle(out var handle));
+        Assert.False(handle.WaitOne(TimeSpan.Zero));
+
+        mre.Set();
+        Assert.True(handle.WaitOne(1.Seconds()));
+
+        mre.Reset();
+        Assert.False(handle.WaitOne(TimeSpan.Zero));
+
+        mre.DetachAndDisposeWaitHandle();
+    }
+
+    #endregion
 }

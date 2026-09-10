@@ -553,4 +553,107 @@ public class AsyncWaitHandleTests
     }
 
     #endregion
+
+    #region Blocking Wait under a SynchronizationContext
+
+    [Fact]
+    public void Wait_OnSingleThreadContext_DeadlocksWhenContinuationCapturesContext()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+        using var context = new SingleThreadSynchronizationContext();
+
+        var tcs = new TaskCompletionSource<bool>();
+        var done = new ManualResetEventSlim();
+
+        context.Post(_ =>
+        {
+            // Started ON the context thread, so this await captures the single-threaded context
+            // and its continuation can only run on this very thread.
+            var capturing = Continue(tcs.Task);
+            IAsyncWaitHandle handle = AsyncWaitHandle.FromTask(capturing);
+
+            // Blocking here for work whose continuation needs this same thread.
+            handle.Wait();
+            done.Set();
+        }, null);
+
+        Task.Run(async () => { await Task.Delay(50); tcs.SetResult(true); });
+
+        // Documents INHERENT behaviour: sync-over-async on a single-threaded context deadlocks.
+        // It cannot be fixed inside Wait(), because the context is captured when the awaited task
+        // is created. The mitigation is to use WaitAsync(), or to suspend the context around the
+        // invocation that creates the task. See the XML docs on AsyncWaitHandle.Wait().
+        Assert.False(done.Wait(500), "Expected the documented deadlock, but the wait completed");
+
+        static async Task Continue(Task antecedent)
+        {
+            await antecedent; // captures SynchronizationContext.Current
+        }
+    }
+
+    [Fact]
+    public void WaitAsync_OnSingleThreadContext_DoesNotDeadlock()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+        using var context = new SingleThreadSynchronizationContext();
+
+        var tcs = new TaskCompletionSource<bool>();
+        var done = new ManualResetEventSlim();
+        bool result = false;
+
+        // The recommended alternative to the blocking Wait() above: awaiting keeps the context
+        // thread free to run the captured continuation.
+        context.Post(async _ =>
+        {
+            var capturing = Continue(tcs.Task);
+            IAsyncWaitHandle handle = AsyncWaitHandle.FromTask(capturing);
+
+            result = await handle.WaitAsync();
+            done.Set();
+        }, null);
+
+        Task.Run(async () => { await Task.Delay(50); tcs.SetResult(true); });
+
+        Assert.True(done.Wait(3000), "WaitAsync() did not complete on the single threaded context");
+        Assert.True(result);
+
+        static async Task Continue(Task antecedent)
+        {
+            await antecedent;
+        }
+    }
+
+    [Fact]
+    public void TryConvertToWaitHandle_ConcurrentCalls_ReturnTheSameHandle()
+    {
+        using var testContext = TestHelper.PrepareTestContext();
+
+        var tcs = new TaskCompletionSource<bool>();
+        IAsyncWaitHandle handle = AsyncWaitHandle.FromTask(tcs.Task);
+
+        const int threads = 16;
+        var handles = new WaitHandle[threads];
+        var start = new ManualResetEventSlim();
+        var workers = new Thread[threads];
+        for (int i = 0; i < threads; i++)
+        {
+            int index = i;
+            workers[i] = new Thread(() =>
+            {
+                start.Wait();
+                handle.TryConvertToWaitHandle(out handles[index]);
+            });
+            workers[i].Start();
+        }
+        start.Set();
+        foreach (var w in workers) Assert.True(w.Join(TestTimeoutMs));
+
+        // Exactly one instance must win; losers must not publish a different handle.
+        foreach (var h in handles) Assert.Same(handles[0], h);
+
+        tcs.SetResult(true);
+        Assert.True(handles[0].WaitOne(TestTimeoutMs));
+    }
+
+    #endregion
 }

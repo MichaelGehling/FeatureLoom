@@ -29,7 +29,9 @@ namespace FeatureLoom.Web
                 hostAddress = value;
                 try
                 {
-                    address = hostAddress.ResolveToIpAddressAsync(true).WaitFor();
+                    // Suspending around the invocation prevents a deadlock when the property is set
+                    // from a context-bound thread.
+                    using (System.Threading.SynchronizationContext.Current.Suspend()) address = hostAddress.ResolveToIpAddressAsync(true).WaitFor();
                 }
                 catch (Exception e)
                 {

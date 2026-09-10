@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -37,11 +38,56 @@ namespace FeatureLoom.Synchronization;
 /// </summary>
 public sealed class SingleThreadSynchronizationContext : SynchronizationContext, IDisposable
 {
+    /// <summary>
+    /// Tracks the outcome of a <see cref="Send"/> work item so the blocked caller can distinguish
+    /// between successful execution, a faulted callback and a work item that was never executed
+    /// because the context was disposed.
+    /// </summary>
+    private sealed class SendCompletion
+    {
+        // Not disposed on purpose: the waiting caller must not dispose the handle while the
+        // completing thread may still be inside Set(). The handle is cheap and collectable.
+        public readonly ManualResetEventSlim WaitHandle = new ManualResetEventSlim(false);
+        public Exception Exception;
+        public bool Aborted;
+
+        public void Complete(Exception exception)
+        {
+            Exception = exception;
+            WaitHandle.Set();
+        }
+
+        public void Abort()
+        {
+            Aborted = true;
+            WaitHandle.Set();
+        }
+    }
+
+    /// <summary>
+    /// A queued unit of work. <see cref="Completion"/> is null for items posted via <see cref="Post"/>.
+    /// </summary>
+    private readonly struct WorkItem
+    {
+        public readonly SendOrPostCallback Callback;
+        public readonly object State;
+        public readonly SendCompletion Completion;
+
+        public WorkItem(SendOrPostCallback callback, object state, SendCompletion completion = null)
+        {
+            Callback = callback;
+            State = state;
+            Completion = completion;
+        }
+    }
+
     // The latest work item posted from the own thread.
-    private (SendOrPostCallback, object)? currentWorkItem;
+    private WorkItem? currentWorkItem;
     // Queue for pending work items posted from other threads or while a callback is running.
-    private Queue<(SendOrPostCallback, object)> workItems = new();
-    // Lock to protect access to the workItems queue.
+    // It doubles as the registry of pending Send() callers: an item that is still in the queue
+    // has provably not started running, so Dispose() can safely abort it.
+    private Queue<WorkItem> workItems = new();
+    // Lock to protect access to the workItems queue and the disposed flag transition.
     private MicroLock workItemsLock = new MicroLock();
     // The dedicated thread that processes all work items.
     private Thread thread;
@@ -79,9 +125,11 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
         if (disposed) throw new ObjectDisposedException(nameof(SingleThreadSynchronizationContext));
 
         // If called from the context thread and no work is running, set as current work item for immediate execution.
-        if (!currentWorkItem.HasValue && Thread.CurrentThread == thread)
+        // The thread check must come first: currentWorkItem is written by the context thread without
+        // synchronization, so only the context thread itself may read it.
+        if (Thread.CurrentThread == thread && !currentWorkItem.HasValue)
         {
-            currentWorkItem = (d, state);
+            currentWorkItem = new WorkItem(d, state);
             workItemsWaitHandle.Set(); // Signal that there is work to do
         }
         else
@@ -89,7 +137,8 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
             // Otherwise, enqueue the work item for later processing.
             using (workItemsLock.Lock())
             {
-                workItems.Enqueue((d, state));
+                if (disposed) throw new ObjectDisposedException(nameof(SingleThreadSynchronizationContext));
+                workItems.Enqueue(new WorkItem(d, state));
                 workItemsWaitHandle.Set(); // Signal that there is work to do
             }
         }
@@ -102,6 +151,9 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     /// </summary>
     /// <param name="d">The delegate to invoke.</param>
     /// <param name="state">An object passed to the delegate.</param>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown if the context was disposed before the callback could be executed.
+    /// </exception>
     public override void Send(SendOrPostCallback d, object state)
     {
         if (disposed) throw new ObjectDisposedException(nameof(SingleThreadSynchronizationContext));
@@ -114,22 +166,21 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
         }
 
         // Otherwise, enqueue the work item and wait for completion.
-        using (var waitHandle = new ManualResetEventSlim())
+        var completion = new SendCompletion();
+        using (workItemsLock.Lock())
         {
-            Exception exception = null;
-            using (workItemsLock.Lock())
-            {                
-                workItems.Enqueue((s =>
-                {
-                    try { d(s); }
-                    catch (Exception ex) { exception = ex; }
-                    finally { waitHandle.Set(); }
-                }, state));
-                workItemsWaitHandle.Set(); // Signal that there is work to do
-            }
-            waitHandle.Wait();                
-            if (exception != null) throw exception;
+            // Checked under the lock: Dispose() flips the flag and drains the queue under the same
+            // lock, so this item is either enqueued before the drain (and gets aborted) or rejected here.
+            if (disposed) throw new ObjectDisposedException(nameof(SingleThreadSynchronizationContext));
+            workItems.Enqueue(new WorkItem(d, state, completion));
+            workItemsWaitHandle.Set(); // Signal that there is work to do
         }
+
+        completion.WaitHandle.Wait();
+
+        if (completion.Aborted) throw new ObjectDisposedException(nameof(SingleThreadSynchronizationContext));
+        // Rethrow preserving the original stack trace.
+        if (completion.Exception != null) ExceptionDispatchInfo.Capture(completion.Exception).Throw();
     }
 
     /// <summary>
@@ -147,56 +198,73 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
                 {
                     if (workItems.Count == 0)
                     {
-                        var (callback, state) = currentWorkItem.Value;
+                        var item = currentWorkItem.Value;
                         currentWorkItem = null;
-                        callback(state);
+                        Execute(item);
                     }
                     else
                     {
+                        WorkItem item;
                         // If there are queued items, enqueue the current one and process the next from the queue.
                         using (workItemsLock.Lock())
                         {
+                            // Dispose() may have drained the queue in the meantime.
+                            if (disposed) continue;
                             workItems.Enqueue(currentWorkItem.Value);
                             currentWorkItem = null;
 
-                            var (callback, state) = workItems.Dequeue();
-                            callback(state);
+                            item = workItems.Dequeue();
                         }
+                        Execute(item);
                     }
                 }
                 // If there are queued items, process the next one.
                 else if (workItems.Count > 0)
                 {
-                    SendOrPostCallback callback;
-                    object state;
+                    WorkItem item;
                     using (workItemsLock.Lock())
                     {
-                        (callback, state) = workItems.Dequeue();                        
+                        // Dispose() may have drained the queue after the unsynchronized count check.
+                        if (workItems.Count == 0) continue;
+                        item = workItems.Dequeue();
                     }
-                    callback(state);
+                    Execute(item);
                 }
                 // If no work is available, wait for new work to be posted.
+                // This is the ONLY place where the loop blocks, so the wait protocol is documented
+                // and maintained here alone.
                 else
                 {
-                    workItemsWaitHandle.Reset(); // Reset the wait handle
-                    // ensure no new work is posted before resetting the wait handle
-                    if (workItems.Count == 0 && currentWorkItem == null && !disposed)
+                    workItemsWaitHandle.Reset();
+
+                    // The count MUST be read under the lock here.
+                    // Reset() above discards any signal a producer raised before this point, so a
+                    // stale read of 0 would make us block while an item is already queued and its
+                    // wake-up has been erased. Taking the lock (which producers also hold while
+                    // enqueuing) forces an up-to-date read and closes that window.
+                    bool noWork;
+                    using (workItemsLock.Lock())
                     {
-                        workItemsWaitHandle.Wait(); // Wait for new work items                
+                        noWork = workItems.Count == 0;
+                    }
+
+                    // A producer enqueuing AFTER this check is harmless: the event is level-triggered
+                    // (sticky), so a Set() landing between here and Wait() leaves isSet == true and
+                    // Wait() returns immediately. A Set() landing during Wait() is covered by the
+                    // event's internal setCounter re-check under its monitor.
+                    if (noWork && currentWorkItem == null && !disposed)
+                    {
+                        workItemsWaitHandle.Wait(); // Wait for new work items
                     }
                 }
             }
             catch (Exception ex)
             {
-                // On exception, reset the wait handle and wait for new work.
-                workItemsWaitHandle.Reset();
-                if (workItems.Count == 0 && currentWorkItem == null && !disposed)
-                {
-                    workItemsWaitHandle.Wait();
-                }
-
-                // Log the exception asynchronously to avoid blocking the context thread.
-                Task.Run(() => 
+                // A failing callback must not park the loop: pending work may still be queued.
+                // Just log and continue; if there is genuinely nothing to do, the idle branch above
+                // performs the blocking wait using the single, properly synchronized protocol.
+                // Logged asynchronously to avoid blocking the context thread.
+                Task.Run(() =>
                 {
                     OptLog.ERROR()?.Build($"Exception in SingleThreadSynchronizationContext", ex);
                 });
@@ -205,15 +273,56 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     }
 
     /// <summary>
+    /// Executes a work item. For items originating from <see cref="Send"/> the outcome is reported
+    /// to the blocked caller instead of being propagated into the loop's exception handler.
+    /// </summary>
+    private void Execute(in WorkItem item)
+    {
+        var completion = item.Completion;
+        if (completion == null)
+        {
+            item.Callback(item.State);
+            return;
+        }
+
+        try
+        {
+            item.Callback(item.State);
+            completion.Complete(null);
+        }
+        catch (Exception ex)
+        {
+            completion.Complete(ex);
+        }
+    }
+
+    /// <summary>
     /// Disposes the context and signals the dedicated thread to exit.
+    /// Work items that are still queued are aborted, so blocked <see cref="Send"/> callers
+    /// are released with an <see cref="ObjectDisposedException"/> instead of waiting forever.
     /// </summary>
     public void Dispose()
     {
-        if (!disposed)
+        WorkItem[] pending = null;
+        using (workItemsLock.Lock())
         {
+            if (disposed) return;
             disposed = true;
-            workItemsWaitHandle.Set(); // Signal the thread to exit
+            if (workItems.Count > 0)
+            {
+                pending = workItems.ToArray();
+                workItems.Clear();
+            }
         }
+
+        // Released outside the lock: an item still in the queue never started running,
+        // so aborting it cannot race with its execution.
+        if (pending != null)
+        {
+            foreach (var item in pending) item.Completion?.Abort();
+        }
+
+        workItemsWaitHandle.Set(); // Signal the thread to exit
     }
 }
 

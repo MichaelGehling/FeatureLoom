@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Helpers;
 using FeatureLoom.Synchronization;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow;
@@ -58,6 +59,15 @@ public sealed class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessage
     /// Initializes a new instance that executes an asynchronous delegate capable of rejecting messages.
     /// </summary>
     /// <param name="processingAsync">The asynchronous delegate returning true when the message is handled.</param>
+    /// <remarks>
+    /// When the message is delivered via the synchronous <see cref="Post{M}(M)"/>, the delegate is invoked
+    /// with the current <see cref="SynchronizationContext"/> suspended and is then awaited blocking.
+    /// This is required to avoid a deadlock, but it means the delegate's continuations do NOT resume on the
+    /// posting thread's context: they run on thread pool threads. Do not touch context-affine state
+    /// (e.g. UI controls) after an await inside the delegate unless you marshal back explicitly.
+    /// The posting thread's own context is restored again as soon as <see cref="Post{M}(M)"/> returns.
+    /// Use <see cref="PostAsync{M}(M)"/> if the context must be preserved.
+    /// </remarks>
     public ProcessingEndpoint(Func<T, Task<bool>> processingAsync)
     {
         this.action = processingAsync;
@@ -68,6 +78,15 @@ public sealed class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessage
     /// Initializes a new instance that executes an asynchronous delegate without rejection capability.
     /// </summary>
     /// <param name="processingAsync">The asynchronous delegate that processes the message.</param>
+    /// <remarks>
+    /// When the message is delivered via the synchronous <see cref="Post{M}(M)"/>, the delegate is invoked
+    /// with the current <see cref="SynchronizationContext"/> suspended and is then awaited blocking.
+    /// This is required to avoid a deadlock, but it means the delegate's continuations do NOT resume on the
+    /// posting thread's context: they run on thread pool threads. Do not touch context-affine state
+    /// (e.g. UI controls) after an await inside the delegate unless you marshal back explicitly.
+    /// The posting thread's own context is restored again as soon as <see cref="Post{M}(M)"/> returns.
+    /// Use <see cref="PostAsync{M}(M)"/> if the context must be preserved.
+    /// </remarks>
     public ProcessingEndpoint(Func<T, Task> processingAsync)
     {
         this.action = processingAsync;
@@ -94,7 +113,11 @@ public sealed class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessage
                     ((Action<T>)action)(msgT);
                     break;
                 case ActionType.Async:
-                    ((Func<T, Task>)action)(msgT).WaitFor();
+                    // The context must be suspended around the INVOCATION, not around the blocking
+                    // wait: the async action captures SynchronizationContext.Current when it reaches
+                    // its first await. Without this, posting from a UI/single-threaded context and
+                    // blocking here would deadlock.
+                    using (SynchronizationContext.Current.Suspend()) ((Func<T, Task>)action)(msgT).WaitFor();
                     break;
                 case ActionType.SyncChecked:
                     if (!((Func<T, bool>)action)(msgT))
@@ -103,7 +126,9 @@ public sealed class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessage
                     }
                     break;
                 case ActionType.AsyncChecked:
-                    if (!((Func<T, Task<bool>>)action)(msgT).WaitFor())
+                    bool checkedResult;
+                    using (SynchronizationContext.Current.Suspend()) checkedResult = ((Func<T, Task<bool>>)action)(msgT).WaitFor();
+                    if (!checkedResult)
                     {
                         alternativeSendingHelper.ObjIfExists?.Forward(in message);
                     }
@@ -128,7 +153,9 @@ public sealed class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessage
                     ((Action<T>)action)(msgT);
                     break;
                 case ActionType.Async:
-                    ((Func<T, Task>)action)(msgT).WaitFor();
+                    // See Post<M>(in M): suspending around the invocation avoids a sync-over-async
+                    // deadlock when posting from a context-bound thread.
+                    using (SynchronizationContext.Current.Suspend()) ((Func<T, Task>)action)(msgT).WaitFor();
                     break;
                 case ActionType.SyncChecked:
                     if (!((Func<T, bool>)action)(msgT))
@@ -137,7 +164,9 @@ public sealed class ProcessingEndpoint<T> : IMessageSink<T>, IAlternativeMessage
                     }
                     break;
                 case ActionType.AsyncChecked:
-                    if (!((Func<T, Task<bool>>)action)(msgT).WaitFor())
+                    bool checkedResult;
+                    using (SynchronizationContext.Current.Suspend()) checkedResult = ((Func<T, Task<bool>>)action)(msgT).WaitFor();
+                    if (!checkedResult)
                     {
                         alternativeSendingHelper.ObjIfExists?.Forward(message);
                     }

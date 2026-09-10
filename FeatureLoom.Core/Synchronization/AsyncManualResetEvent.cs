@@ -128,8 +128,10 @@ namespace FeatureLoom.Synchronization
 
             lock (monitorObj)
             {
-                if (setCounter != lastSetCount) return true;
-                Monitor.Wait(monitorObj);
+                // Monitor.PulseAll wakes ALL waiters, also when it was triggered by another
+                // waiter's cancellation. Therefore the set counter must be re-checked in a loop,
+                // otherwise a foreign wakeup would be reported as "set".
+                while (setCounter == lastSetCount) Monitor.Wait(monitorObj);
             }
             return true;
         }
@@ -167,8 +169,14 @@ namespace FeatureLoom.Synchronization
 
             lock (monitorObj)
             {
-                if (setCounter != lastSetCount) return true;
-                return Monitor.Wait(monitorObj, timer.Remaining());
+                while (setCounter == lastSetCount)
+                {
+                    var remaining = timer.Remaining();
+                    if (remaining <= TimeSpan.Zero) return false;
+                    // A returned false means the timeout elapsed; a foreign wakeup re-enters the loop.
+                    if (!Monitor.Wait(monitorObj, remaining)) return false;
+                }
+                return true;
             }
         }
 
@@ -205,17 +213,19 @@ namespace FeatureLoom.Synchronization
 
             using (cancellationToken.Register(Cancellation, this))
             {
-                do
+                lock (monitorObj)
                 {
-                    lock (monitorObj)
+                    while (setCounter == lastSetCount)
                     {
-                        if (setCounter != lastSetCount) return true;
+                        // The cancellation check must happen inside the monitor lock: otherwise the
+                        // cancellation callback could pulse before this thread reaches Monitor.Wait,
+                        // and the untimed wait would never be woken up again.
+                        if (cancellationToken.IsCancellationRequested) return false;
                         Monitor.Wait(monitorObj);
                     }
                 }
-                while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
             }
-            return !cancellationToken.IsCancellationRequested;
+            return true;
         }
 
         /// <summary>
@@ -255,17 +265,20 @@ namespace FeatureLoom.Synchronization
 
             using (cancellationToken.Register(Cancellation, this))
             {
-                do
+                lock (monitorObj)
                 {
-                    lock (monitorObj)
+                    while (setCounter == lastSetCount)
                     {
-                        if (setCounter != lastSetCount) return true;
-                        if (!Monitor.Wait(monitorObj, timer.Remaining())) return false;
+                        // See WaitSlow(CancellationToken): checking inside the lock closes the
+                        // window in which the cancellation pulse could get lost.
+                        if (cancellationToken.IsCancellationRequested) return false;
+                        var remaining = timer.Remaining();
+                        if (remaining <= TimeSpan.Zero) return false;
+                        if (!Monitor.Wait(monitorObj, remaining)) return false;
                     }
+                    return true;
                 }
-                while (setCounter == lastSetCount && !cancellationToken.IsCancellationRequested);
             }
-            return !cancellationToken.IsCancellationRequested;
         }
 
         private void Cancellation(object self)
@@ -467,14 +480,25 @@ namespace FeatureLoom.Synchronization
         public bool Reset()
         {
             if (!isSet) return false;
-            
+
+            myLock.Enter();
+            // The state and the kernel handle must be updated under the same lock as in Set(),
+            // otherwise a concurrent Set/Reset could leave the EventWaitHandle signalled
+            // while the event itself is reset (or vice versa).
+            if (!isSet)
+            {
+                myLock.Exit();
+                return false;
+            }
+
             isSet = false;
-            
+
             if (eventWaitHandle != null)
             {
                 eventWaitHandle.Reset();
             }
-            
+            myLock.Exit();
+
             notifier.Forward(false);
             return true;
         }
@@ -486,11 +510,15 @@ namespace FeatureLoom.Synchronization
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void PulseAll()
         {
-            if (isSet && Reset()) return;
             myLock.Enter();
-            if (isSet && Reset())
+            if (isSet)
             {
+                // Already set: a plain reset is enough to make all future waiters wait again.
+                // The reset is inlined instead of calling Reset(), because myLock is not reentrant.
+                isSet = false;
+                if (eventWaitHandle != null) eventWaitHandle.Reset();
                 myLock.Exit();
+                notifier.Forward(false);
                 return;
             }
 
@@ -556,9 +584,23 @@ namespace FeatureLoom.Synchronization
         /// <returns>Always true</returns>
         public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
         {
-            if (eventWaitHandle == null) Interlocked.CompareExchange(ref eventWaitHandle, new EventWaitHandle(isSet, EventResetMode.ManualReset), null);
-            
-            waitHandle = eventWaitHandle;
+            var handle = eventWaitHandle;
+            if (handle == null)
+            {
+                // Creating the handle under myLock ensures that its initial state matches isSet and
+                // that a concurrent Set/Reset either sees the handle or happens strictly before it
+                // is created. It also avoids allocating a handle that would have to be discarded.
+                myLock.Enter();
+                handle = eventWaitHandle;
+                if (handle == null)
+                {
+                    handle = new EventWaitHandle(isSet, EventResetMode.ManualReset);
+                    eventWaitHandle = handle;
+                }
+                myLock.Exit();
+            }
+
+            waitHandle = handle;
             return true;
         }
 
@@ -567,8 +609,13 @@ namespace FeatureLoom.Synchronization
         /// </summary>
         public void DetachAndDisposeWaitHandle()
         {
+            // Detaching under myLock guarantees that no concurrent Set/Reset is currently
+            // using the handle, which would otherwise throw an ObjectDisposedException.
+            myLock.Enter();
             var waitHandle = eventWaitHandle;
             eventWaitHandle = null;
+            myLock.Exit();
+
             waitHandle?.Dispose();
         }
 

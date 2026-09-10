@@ -131,6 +131,14 @@ public sealed class Aggregator<T> : IMessageSink<T>, IMessageSource, IDisposable
     /// <remarks>
     /// The timeout schedule is parentless and kept only via weak references by <see cref="SchedulerService"/>.
     /// If this instance becomes unreachable or is disposed, the schedule will be tidied automatically.
+    /// <para>
+    /// When a message arrives via the synchronous <c>Post</c>, <paramref name="onMessageAsync"/> is invoked
+    /// with the current <see cref="System.Threading.SynchronizationContext"/> suspended and is then awaited
+    /// blocking. This is required to avoid a deadlock, but it means the handler's continuations do NOT resume
+    /// on the posting thread's context: they run on thread pool threads. Do not touch context-affine state
+    /// (e.g. UI controls) after an await inside the handler unless you marshal back explicitly.
+    /// The posting thread's own context is restored again as soon as <c>Post</c> returns.
+    /// </para>
     /// </remarks>
     public Aggregator(Func<T, ISender, Task> onMessageAsync, Func<ISender, Task> onTimeoutAsync = null, TimeSpan timeout = default, bool resetTimeoutOnMessage = true, bool autoLock = true)
     {
@@ -140,7 +148,10 @@ public sealed class Aggregator<T> : IMessageSink<T>, IMessageSource, IDisposable
         sender = new AggregationSender(autoLock);
         this.resetTimeoutOnMessage = false;
 
-        this.onMessage = (msg, s) => onMessageAsync(msg, s).WaitFor();
+        // The context is suspended around the INVOCATION, because onMessageAsync captures
+        // SynchronizationContext.Current at its first await. Blocking afterwards on a
+        // context-bound thread would otherwise deadlock.
+        this.onMessage = (msg, s) => { using (SynchronizationContext.Current.Suspend()) onMessageAsync(msg, s).WaitFor(); };
 
         if (onTimeoutAsync != null && timeout > TimeSpan.Zero)
         {

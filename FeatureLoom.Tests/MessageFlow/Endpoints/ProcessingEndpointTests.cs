@@ -1,6 +1,9 @@
 ﻿using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using FeatureLoom.Helpers;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Time;
 using Xunit;
 
 namespace FeatureLoom.MessageFlow
@@ -160,6 +163,32 @@ namespace FeatureLoom.MessageFlow
                 Post(message);
                 return Task.CompletedTask;
             }
+        }
+
+        [Fact]
+        public void PostingAnAsyncActionFromASingleThreadContextDoesNotDeadlock()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+            using var context = new SingleThreadSynchronizationContext();
+
+            bool processed = false;
+            var processor = new ProcessingEndpoint<bool>(async msg =>
+            {
+                // ConfigureAwait(true) forces the continuation back onto the captured context,
+                // which is exactly the situation that deadlocks a naive sync-over-async Post.
+                await Task.Delay(20).ConfigureAwait(true);
+                processed = msg;
+            });
+
+            var finished = new ManualResetEventSlim(false);
+            context.Post(_ =>
+            {
+                processor.Post(true);
+                finished.Set();
+            }, null);
+
+            Assert.True(finished.Wait(10.Seconds()));
+            Assert.True(processed);
         }
     }
 }

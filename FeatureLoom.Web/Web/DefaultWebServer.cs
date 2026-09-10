@@ -54,7 +54,9 @@ namespace FeatureLoom.Web
         public DefaultWebServer()
         {
             favicon = Resource.favicon;
-            TryUpdateConfigAsync().WaitFor();
+            // Suspending around the invocation prevents a deadlock when the server is constructed
+            // on a context-bound thread (e.g. a UI thread).
+            using (System.Threading.SynchronizationContext.Current.Suspend()) TryUpdateConfigAsync().WaitFor();
         }
 
         public async Task<bool> TryUpdateConfigAsync()
