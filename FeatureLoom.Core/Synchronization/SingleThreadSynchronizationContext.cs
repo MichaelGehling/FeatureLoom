@@ -95,11 +95,55 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     private AsyncManualResetEvent workItemsWaitHandle = new(false);
     // Indicates whether the context has been disposed and should stop processing.
     private volatile bool disposed;
+    // Diagnostics: set while the context thread is parked in the idle wait (no work available).
+    private volatile bool waitingForWork;
+    // Diagnostics: number of work items the context thread started executing. Written ONLY by the
+    // context thread, so a plain increment on a volatile field is sufficient - no interlocked needed.
+    private volatile int startedWorkItemsCount;
+    // Diagnostics: number of work items that finished execution. Same single-writer rule.
+    // A difference to startedWorkItemsCount means a callback is currently running.
+    private volatile int finishedWorkItemsCount;
 
     /// <summary>
     /// The dedicated thread used by this SynchronizationContext.
     /// </summary>
     public Thread Thread => thread;
+
+    /// <summary>
+    /// Number of work items that are queued and waiting to be executed.
+    /// Intended for diagnostics/watchdogs: a permanently growing value indicates that the
+    /// context thread cannot keep up or is blocked.
+    /// The value is read without locking and is therefore only a snapshot.
+    /// </summary>
+    public int QueuedWorkItemsCount => workItems.Count;
+
+    /// <summary>
+    /// True while the context thread is parked in its idle wait because no work is available.
+    /// A watchdog seeing <c>false</c> together with a non-zero <see cref="QueuedWorkItemsCount"/>
+    /// and a stagnating <see cref="FinishedWorkItemsCount"/> has found a stuck callback.
+    /// </summary>
+    public bool IsWaitingForWork => waitingForWork;
+
+    /// <summary>
+    /// Number of work items the context thread started to execute since the context was created.
+    /// </summary>
+    public int StartedWorkItemsCount => startedWorkItemsCount;
+
+    /// <summary>
+    /// Number of work items that finished execution since the context was created.
+    /// </summary>
+    public int FinishedWorkItemsCount => finishedWorkItemsCount;
+
+    /// <summary>
+    /// True while the context thread is inside a work item callback.
+    /// If this stays true while <see cref="FinishedWorkItemsCount"/> does not change, the callback is stuck.
+    /// </summary>
+    public bool IsExecutingWorkItem => startedWorkItemsCount != finishedWorkItemsCount;
+
+    /// <summary>
+    /// True if the context was disposed and the dedicated thread is shutting down or already stopped.
+    /// </summary>
+    public bool IsDisposed => disposed;
 
     /// <summary>
     /// Initializes a new instance and starts the dedicated thread.
@@ -254,7 +298,15 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
                     // event's internal setCounter re-check under its monitor.
                     if (noWork && currentWorkItem == null && !disposed)
                     {
-                        workItemsWaitHandle.Wait(); // Wait for new work items
+                        waitingForWork = true;
+                        try
+                        {
+                            workItemsWaitHandle.Wait(); // Wait for new work items
+                        }
+                        finally
+                        {
+                            waitingForWork = false;
+                        }
                     }
                 }
             }
@@ -278,21 +330,30 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     /// </summary>
     private void Execute(in WorkItem item)
     {
-        var completion = item.Completion;
-        if (completion == null)
-        {
-            item.Callback(item.State);
-            return;
-        }
-
+        // Only ever incremented by the context thread, so no synchronization is required.
+        startedWorkItemsCount++;
         try
         {
-            item.Callback(item.State);
-            completion.Complete(null);
+            var completion = item.Completion;
+            if (completion == null)
+            {
+                item.Callback(item.State);
+                return;
+            }
+
+            try
+            {
+                item.Callback(item.State);
+                completion.Complete(null);
+            }
+            catch (Exception ex)
+            {
+                completion.Complete(ex);
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            completion.Complete(ex);
+            finishedWorkItemsCount++;
         }
     }
 

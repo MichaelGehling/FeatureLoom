@@ -242,6 +242,58 @@ public class SingleThreadSynchronizationContextTests
         return true;
     }
 
+    [Fact]
+    public void DiagnosticProperties_ReflectQueueAndThreadState()
+    {
+        using var context = new SingleThreadSynchronizationContext();
+
+        // Idle: the thread must end up parked in the wait, with nothing queued.
+        Assert.True(SpinUntil(() => context.IsWaitingForWork, 1000));
+        Assert.Equal(0, context.QueuedWorkItemsCount);
+        Assert.False(context.IsExecutingWorkItem);
+        Assert.False(context.IsDisposed);
+
+        int executedBefore = context.FinishedWorkItemsCount;
+
+        var blocking = new ManualResetEventSlim();
+        var running = new ManualResetEventSlim();
+        context.Post(_ =>
+        {
+            running.Set();
+            blocking.Wait(5000);
+        }, null);
+        Assert.True(running.Wait(1000));
+
+        // While a callback is running the thread is neither waiting nor idle,
+        // and further posted items pile up in the queue.
+        context.Post(_ => { }, null);
+        context.Post(_ => { }, null);
+        Assert.False(context.IsWaitingForWork);
+        Assert.True(SpinUntil(() => context.QueuedWorkItemsCount >= 2, 1000));
+        Assert.True(context.IsExecutingWorkItem);
+
+        blocking.Set();
+
+        Assert.True(SpinUntil(() => context.FinishedWorkItemsCount >= executedBefore + 3, 1000));
+        Assert.True(SpinUntil(() => context.QueuedWorkItemsCount == 0 && context.IsWaitingForWork, 1000));
+        Assert.False(context.IsExecutingWorkItem);
+        Assert.Equal(context.StartedWorkItemsCount, context.FinishedWorkItemsCount);
+
+        context.Dispose();
+        Assert.True(context.IsDisposed);
+    }
+
+    private static bool SpinUntil(Func<bool> condition, int timeoutMs)
+    {
+        var limit = Environment.TickCount + timeoutMs;
+        while (Environment.TickCount < limit)
+        {
+            if (condition()) return true;
+            Thread.Sleep(5);
+        }
+        return condition();
+    }
+
     // Helper to get the context thread id by posting a callback and capturing the thread id
     private int contextThreadId(SingleThreadSynchronizationContext context)
     {
