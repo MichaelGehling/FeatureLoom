@@ -16,6 +16,7 @@ Solution: `FeatureProjects.sln`.
 - Report results and facts, not intentions. No restating of the plan before every step.
 - State uncertainty explicitly instead of guessing; ask rather than assume when a decision has real consequences.
 - Ask if instructions are unclear or if information is missing and cannot easily be found.
+- Give a very brief feedback if a request seems rational, unclear or potentially harmful. If harmful ask for clarification before proceeding.
 
 ## Working rules
 - For extensive/complex tasks prepare a plan first (create .md files in /plans folder) and update it as you go. Use the plan to communicate progress and decisions. Split bigger plans into an overview and smaller sub-plans.

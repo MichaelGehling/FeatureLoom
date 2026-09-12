@@ -1,4 +1,6 @@
 ﻿using FeatureLoom.Logging;
+using FeatureLoom.DependencyInversion;
+using FeatureLoom.Scheduling;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -12,6 +14,15 @@ namespace FeatureLoom.Synchronization;
 /// <summary>
 /// A SynchronizationContext that processes all posted work items on a single dedicated thread.
 /// Ensures that all callbacks are executed sequentially on the same thread, similar to a UI message loop.
+/// <para>
+/// An optional cooperative watchdog can be enabled with <see cref="EnableWatchdog"/> or, from the context
+/// thread, <see cref="EnableWatchdogForCurrentThread"/>. It reports <see cref="StallState.Stalled"/> when no
+/// work item completes and no explicit life sign is received within the configured threshold. Long-running
+/// synchronous callbacks can call <see cref="ReportLifeSign"/> periodically to show that they are still
+/// making progress. After a reported stall, the next completed work item or life sign produces a
+/// <see cref="StallState.Recovered"/> event. The watchdog is disabled by default and is purely observational;
+/// it does not interrupt, replace or recover the dedicated thread.
+/// </para>
 ///
 /// <para>Example usage:</para>
 /// <code>
@@ -34,10 +45,67 @@ namespace FeatureLoom.Synchronization;
 ///     await Task.Delay(100);
 ///     Console.WriteLine($"After await, thread {Thread.CurrentThread.ManagedThreadId}");
 /// }, null);
+///
+/// // Optionally monitor the context. The callback runs on the scheduler thread.
+/// context.EnableWatchdog(
+///     e => Console.WriteLine($"Watchdog state: {e.State}, duration: {e.StallDuration}"),
+///     TimeSpan.FromSeconds(10));
+///
+/// // A long-running synchronous callback should report cooperative progress.
+/// context.Post(_ =>
+/// {
+///     while (MoreWork())
+///     {
+///         ProcessNextPart();
+///         SingleThreadSynchronizationContext.ReportLifeSign();
+///     }
+/// }, null);
 /// </code>
 /// </summary>
 public sealed class SingleThreadSynchronizationContext : SynchronizationContext, IDisposable
 {
+    /// <summary>State reported by the cooperative watchdog.</summary>
+    public enum StallState
+    {
+        /// <summary>No progress was observed for at least the configured stall threshold.</summary>
+        Stalled,
+        /// <summary>Progress resumed after a previously reported stall.</summary>
+        Recovered
+    }
+
+    /// <summary>Describes a state transition detected by the optional cooperative watchdog.</summary>
+    public readonly struct WatchdogEvent
+    {
+        /// <summary>The observed context. It may already be disposed when the callback handles the report.</summary>
+        public readonly SingleThreadSynchronizationContext Context;
+
+        /// <summary>Whether the context is stalled or has recovered from a reported stall.</summary>
+        public readonly StallState State;
+
+        /// <summary>How long no completed work item or explicit life sign was observed.</summary>
+        public readonly TimeSpan StallDuration;
+
+        /// <summary>Number of work items waiting in the queue when the event was detected.</summary>
+        public readonly int QueuedWorkItemsCount;
+
+        public WatchdogEvent(SingleThreadSynchronizationContext context, StallState state,
+            TimeSpan stallDuration, int queuedWorkItemsCount)
+        {
+            Context = context;
+            State = state;
+            StallDuration = stallDuration;
+            QueuedWorkItemsCount = queuedWorkItemsCount;
+        }
+
+        public override string ToString() =>
+            State == StallState.Stalled
+                ? $"SingleThreadSynchronizationContext '{Context?.Thread?.Name}' reported no life sign for {StallDuration} with {QueuedWorkItemsCount} queued work item(s)."
+                : $"SingleThreadSynchronizationContext '{Context?.Thread?.Name}' recovered after {StallDuration} with {QueuedWorkItemsCount} queued work item(s).";
+    }
+
+    [ThreadStatic]
+    private static SingleThreadSynchronizationContext currentThreadContext;
+
     /// <summary>
     /// Tracks the outcome of a <see cref="Send"/> work item so the blocked caller can distinguish
     /// between successful execution, a faulted callback and a work item that was never executed
@@ -103,6 +171,20 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     // Diagnostics: number of work items that finished execution. Same single-writer rule.
     // A difference to startedWorkItemsCount means a callback is currently running.
     private volatile int finishedWorkItemsCount;
+    // Optional cooperative watchdog. The hot path only checks this flag when ReportLifeSign() is called.
+    private volatile bool watchdogEnabled;
+    private volatile int lifeSignCount;
+    private MicroLock watchdogLock = new MicroLock();
+    private ActionSchedule watchdogSchedule;
+    private Action<WatchdogEvent> watchdogCallback;
+    private TimeSpan watchdogStallThreshold;
+    private TimeSpan watchdogRepeatInterval;
+    private int watchdogGeneration;
+    // Sampling state is accessed only by the scheduler callback.
+    private int watchdogLastProgressCount;
+    private DateTime watchdogUnchangedSince;
+    private DateTime watchdogLastReported;
+    private bool watchdogStallReported;
 
     /// <summary>
     /// The dedicated thread used by this SynchronizationContext.
@@ -144,6 +226,129 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     /// True if the context was disposed and the dedicated thread is shutting down or already stopped.
     /// </summary>
     public bool IsDisposed => disposed;
+
+    /// <summary>
+    /// Reports cooperative progress from code currently running on a
+    /// <see cref="SingleThreadSynchronizationContext"/> thread.
+    /// </summary>
+    /// <remarks>
+    /// This is a no-op outside such a thread and while its watchdog is disabled. When enabled, its cost is
+    /// one thread-static lookup, one flag read and one plain increment. Long-running synchronous callbacks
+    /// should call this periodically to distinguish useful progress from a stall.
+    /// </remarks>
+    public static void ReportLifeSign()
+    {
+        var context = currentThreadContext;
+        if (context?.watchdogEnabled == true) context.lifeSignCount++;
+    }
+
+    /// <summary>
+    /// Enables or replaces the optional cooperative watchdog.
+    /// </summary>
+    /// <param name="onStall">Called on the scheduler thread when the context enters a stalled state and
+    /// again when a later life sign or completed work item indicates recovery. Ongoing stalls may be
+    /// reported repeatedly according to <paramref name="repeatInterval"/>.</param>
+    /// <param name="stallThreshold">Maximum time without observable progress.</param>
+    /// <param name="checkInterval">Sampling interval. Defaults to one quarter of the stall threshold.</param>
+    /// <param name="repeatInterval">Minimum interval between reports for the same ongoing stall. Defaults
+    /// to the stall threshold.</param>
+    public void EnableWatchdog(Action<WatchdogEvent> onStall, TimeSpan stallThreshold,
+        TimeSpan? checkInterval = null, TimeSpan? repeatInterval = null)
+    {
+        if (onStall == null) throw new ArgumentNullException(nameof(onStall));
+        if (stallThreshold <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(stallThreshold));
+        if (disposed) throw new ObjectDisposedException(nameof(SingleThreadSynchronizationContext));
+
+        TimeSpan interval = checkInterval ?? TimeSpan.FromTicks(stallThreshold.Ticks / 4);
+        if (interval <= TimeSpan.Zero) interval = stallThreshold;
+        TimeSpan repeat = repeatInterval ?? stallThreshold;
+        if (repeat <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(repeatInterval));
+
+        using (watchdogLock.Lock())
+        {
+            int generation = ++watchdogGeneration;
+            watchdogCallback = onStall;
+            watchdogStallThreshold = stallThreshold;
+            watchdogRepeatInterval = repeat;
+            watchdogLastProgressCount = finishedWorkItemsCount + lifeSignCount;
+            watchdogUnchangedSince = DateTime.MinValue;
+            watchdogLastReported = DateTime.MinValue;
+            watchdogStallReported = false;
+            watchdogEnabled = true;
+
+            watchdogSchedule = Service<SchedulerService>.Instance.ScheduleAction(
+                $"Watchdog for {thread.Name}", now => CheckWatchdog(now, interval, generation));
+        }
+    }
+
+    /// <summary>
+    /// Enables or replaces the watchdog of the context owning the current thread.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The current thread does not belong to a
+    /// <see cref="SingleThreadSynchronizationContext"/>.</exception>
+    public static void EnableWatchdogForCurrentThread(Action<WatchdogEvent> onStall,
+        TimeSpan stallThreshold, TimeSpan? checkInterval = null, TimeSpan? repeatInterval = null)
+    {
+        var context = currentThreadContext;
+        if (context == null) throw new InvalidOperationException("The current thread is not owned by a SingleThreadSynchronizationContext.");
+        context.EnableWatchdog(onStall, stallThreshold, checkInterval, repeatInterval);
+    }
+
+    /// <summary>Disables the watchdog. The context itself remains active.</summary>
+    public void DisableWatchdog()
+    {
+        using (watchdogLock.Lock())
+        {
+            watchdogEnabled = false;
+            watchdogGeneration++;
+            watchdogSchedule = null;
+            watchdogCallback = null;
+        }
+    }
+
+    private ScheduleStatus CheckWatchdog(DateTime now, TimeSpan interval, int generation)
+    {
+        Action<WatchdogEvent> callback = null;
+        WatchdogEvent watchdogEvent = default;
+
+        using (watchdogLock.Lock())
+        {
+            if (!watchdogEnabled || disposed || generation != watchdogGeneration) return ScheduleStatus.Terminated;
+
+            int progressCount = finishedWorkItemsCount + lifeSignCount;
+            if (!IsExecutingWorkItem || progressCount != watchdogLastProgressCount)
+            {
+                if (watchdogStallReported)
+                {
+                    callback = watchdogCallback;
+                    watchdogEvent = new WatchdogEvent(this,
+                        StallState.Recovered,
+                        now - watchdogUnchangedSince, QueuedWorkItemsCount);
+                    watchdogStallReported = false;
+                }
+                watchdogLastProgressCount = progressCount;
+                watchdogUnchangedSince = now;
+                watchdogLastReported = DateTime.MinValue;
+            }
+            else
+            {
+                if (watchdogUnchangedSince == DateTime.MinValue) watchdogUnchangedSince = now;
+                TimeSpan duration = now - watchdogUnchangedSince;
+                if (duration >= watchdogStallThreshold && now - watchdogLastReported >= watchdogRepeatInterval)
+                {
+                    watchdogLastReported = now;
+                    watchdogStallReported = true;
+                    callback = watchdogCallback;
+                    watchdogEvent = new WatchdogEvent(this,
+                        StallState.Stalled,
+                        duration, QueuedWorkItemsCount);
+                }
+            }
+        }
+
+        callback?.Invoke(watchdogEvent);
+        return ScheduleStatus.WaitUntil(now + interval);
+    }
 
     /// <summary>
     /// Initializes a new instance and starts the dedicated thread.
@@ -232,11 +437,14 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     /// </summary>
     private void Run()
     {
+        currentThreadContext = this;
         SetSynchronizationContext(this);
-        while (!disposed)
+        try
         {
-            try
+            while (!disposed)
             {
+                try
+                {
                 // If there is a current work item, process it.
                 if (currentWorkItem.HasValue)
                 {
@@ -309,18 +517,23 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
                         }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
+                }
+                catch (Exception ex)
+                {
                 // A failing callback must not park the loop: pending work may still be queued.
                 // Just log and continue; if there is genuinely nothing to do, the idle branch above
                 // performs the blocking wait using the single, properly synchronized protocol.
                 // Logged asynchronously to avoid blocking the context thread.
-                Task.Run(() =>
-                {
-                    OptLog.ERROR()?.Build($"Exception in SingleThreadSynchronizationContext", ex);
-                });
+                    Task.Run(() =>
+                    {
+                        OptLog.ERROR()?.Build($"Exception in SingleThreadSynchronizationContext", ex);
+                    });
+                }
             }
+        }
+        finally
+        {
+            currentThreadContext = null;
         }
     }
 
@@ -364,6 +577,7 @@ public sealed class SingleThreadSynchronizationContext : SynchronizationContext,
     /// </summary>
     public void Dispose()
     {
+        DisableWatchdog();
         WorkItem[] pending = null;
         using (workItemsLock.Lock())
         {
