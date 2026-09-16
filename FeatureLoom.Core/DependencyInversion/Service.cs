@@ -268,7 +268,8 @@ namespace FeatureLoom.DependencyInversion
         }
 
         /// <summary>
-        /// Clears all context-local service instances, optionally using the local instance as the new global instance.
+        /// Clears this service's named and unnamed instances in the current scope and current context's explicit overrides.
+        /// Independent scopes are not cleared.
         /// </summary>
         /// <param name="useLocalInstanceAsGlobal">If true, replaces the global instance with the local instance.</param>
         /// <remarks>
@@ -277,9 +278,20 @@ namespace FeatureLoom.DependencyInversion
         /// </remarks>
         public static void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
         {
-            if (unnamedInstanceContainer != null) unnamedInstanceContainer.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal);
+            ClearAllLocalServiceInstances(useLocalInstanceAsGlobal, false);
+        }
+
+        /// <summary>
+        /// Clears this service's current-scope instances, or explicitly clears its instances in every context.
+        /// Subsequent lookups fall back to global instances for the cleared entries.
+        /// </summary>
+        /// <param name="useLocalInstanceAsGlobal">If true, promotes only the caller's completed local instances to globals.</param>
+        /// <param name="allContexts">If true, clears this service in all contexts; otherwise only in the caller's scope and context.</param>
+        public static void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal, bool allContexts = false)
+        {
+            if (unnamedInstanceContainer != null) unnamedInstanceContainer.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal, allContexts);
             var namedInstanceContainersCopy = namedInstanceContainers;
-            foreach (var container in namedInstanceContainersCopy.Values) container.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal);
+            foreach (var container in namedInstanceContainersCopy.Values) container.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal, allContexts);
         }
 
         // Internal helper: Handles setting an instance when not yet initialized.
@@ -317,9 +329,13 @@ namespace FeatureLoom.DependencyInversion
             else using (modifyLock.Lock())
             {
                 var namedInstanceContainersCopy = namedInstanceContainers;
-                Dictionary<string, ServiceInstanceContainer> newNamedInstanceContainers = new Dictionary<string, ServiceInstanceContainer>(namedInstanceContainersCopy);
-                newNamedInstanceContainers.Add(serviceInstanceName, newContainer);
-                namedInstanceContainers = newNamedInstanceContainers;
+                if (namedInstanceContainersCopy.TryGetValue(serviceInstanceName, out var cachedContainer)) newContainer = cachedContainer;
+                else
+                {
+                    Dictionary<string, ServiceInstanceContainer> newNamedInstanceContainers = new Dictionary<string, ServiceInstanceContainer>(namedInstanceContainersCopy);
+                    newNamedInstanceContainers.Add(serviceInstanceName, newContainer);
+                    namedInstanceContainers = newNamedInstanceContainers;
+                }
             }
             return newContainer.Instance;
         }

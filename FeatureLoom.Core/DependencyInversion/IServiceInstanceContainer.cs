@@ -19,5 +19,7 @@ namespace FeatureLoom.DependencyInversion
     {
         void EnableLocalServiceInstances();
         Action PrepareLocalServiceInstance();
+        object GetGlobalInstance();
+        void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal, bool allContexts);
     }
 }

@@ -27,8 +27,19 @@ namespace FeatureLoom.DependencyInversion
         // Lock to ensure thread-safe access to the registry.
         static MicroLock registryLock = new MicroLock();
 
-        // Indicates if local (contextual) instances are active for all services.
-        static volatile bool localInstancesForAllServicesActive = false;
+        // New containers need local storage even if registered outside an already existing scope.
+        static bool localScopeStorageEnabled = false;
+        static readonly AsyncLocal<LocalServiceScope> currentLocalScope = new AsyncLocal<LocalServiceScope>();
+        static readonly List<WeakReference<LocalServiceScope>> localScopes = new List<WeakReference<LocalServiceScope>>();
+
+        internal static LocalServiceScope CurrentLocalScope
+        {
+            get
+            {
+                var scope = currentLocalScope.Value;
+                return scope != null && scope.IsActive ? scope : null;
+            }
+        }
 
         /// <summary>
         /// Gets or sets whether the registry is allowed to search all loaded assemblies for a suitable implementation
@@ -37,9 +48,9 @@ namespace FeatureLoom.DependencyInversion
         public static bool AllowToSearchAssembly { get; set; } = true;
 
         /// <summary>
-        /// Gets whether local (contextual) instances are active for all services.
+        /// Gets whether the current execution context has an active local-service scope.
         /// </summary>
-        public static bool LocalInstancesForAllServicesActive => localInstancesForAllServicesActive;
+        public static bool LocalInstancesForAllServicesActive => CurrentLocalScope != null;
 
         /// <summary>
         /// Registers a service instance container in the registry.
@@ -50,7 +61,7 @@ namespace FeatureLoom.DependencyInversion
         {
             using (registryLock.Lock())
             {
-                if (localInstancesForAllServicesActive) service.EnableLocalServiceInstances();
+                if (localScopeStorageEnabled) service.EnableLocalServiceInstances();
                 services[service.GetTypeAndName()] = service;
             }
         }
@@ -118,7 +129,8 @@ namespace FeatureLoom.DependencyInversion
         }
 
         /// <summary>
-        /// Activates local (contextual) instances for all registered services.
+        /// Creates a new local-service scope shared by the current execution context and its descendants.
+        /// Services first registered or resolved later also use this scope. Separate activations have independent instances.
         /// Prepares all current-context slots before constructing services, so dependencies use the new local instances.
         /// Concurrent clearing discards pending local instances; construction already in progress may still complete.
         /// </summary>
@@ -127,7 +139,11 @@ namespace FeatureLoom.DependencyInversion
             Action[] initialize;
             using (registryLock.Lock())
             {
-                localInstancesForAllServicesActive = true;
+                var scope = new LocalServiceScope();
+                currentLocalScope.Value = scope;
+                localScopeStorageEnabled = true;
+                localScopes.RemoveAll(reference => !reference.TryGetTarget(out var existing) || !existing.IsActive);
+                localScopes.Add(new WeakReference<LocalServiceScope>(scope));
                 initialize = new Action[services.Count];
                 int index = 0;
                 foreach (var service in services.Values)
@@ -141,19 +157,41 @@ namespace FeatureLoom.DependencyInversion
         }
 
         /// <summary>
-        /// Clears all local (contextual) service instances for all services.
-        /// Optionally replaces the global instance with the local instance.
+        /// Clears the current local-service scope, including its descendants, without clearing independent scopes.
+        /// Subsequent accesses fall back to global instances unless an explicit context-local override applies.
         /// </summary>
-        /// <param name="useLocalInstanceAsGlobal">If true, uses the local instance as the new global instance.</param>
+        /// <param name="useLocalInstanceAsGlobal">If true, promotes completed instances from the caller's scope to global instances.</param>
         public static void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
+        {
+            ClearAllLocalServiceInstances(useLocalInstanceAsGlobal, false);
+        }
+
+        /// <summary>
+        /// Clears the current shared local-service scope, or explicitly clears all contexts.
+        /// In-progress factories may finish, but cannot restore cleared scope entries.
+        /// </summary>
+        /// <param name="useLocalInstanceAsGlobal">If true, promotes only the caller's completed local instances to globals.</param>
+        /// <param name="allContexts">If true, clears all scopes and context-local overrides; otherwise clears only the caller's scope and overrides.</param>
+        public static void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal, bool allContexts = false)
         {
             using (registryLock.Lock())
             {
-                localInstancesForAllServicesActive = false;
+                var currentScope = CurrentLocalScope;
                 foreach (var service in services.Values)
                 {
-                    service.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal);
+                    service.ClearAllLocalServiceInstances(useLocalInstanceAsGlobal, allContexts);
                 }
+                if (allContexts)
+                {
+                    foreach (var reference in localScopes)
+                    {
+                        if (reference.TryGetTarget(out var scope)) scope.Clear();
+                    }
+                    localScopes.Clear();
+                    localScopeStorageEnabled = false;
+                }
+                else currentScope?.Clear();
+                currentLocalScope.Value = null;
             }
         }
 
@@ -267,7 +305,7 @@ namespace FeatureLoom.DependencyInversion
                         otherService.ServiceInstanceName == serviceInstanceName)
                     {
                         instanceContainer = new Service<T>.ServiceInstanceContainer(otherService, serviceInstanceName);
-                        if (localInstancesForAllServicesActive) instanceContainer.EnableLocalServiceInstances();
+                        if (localScopeStorageEnabled) instanceContainer.EnableLocalServiceInstances();
                         services[typeAndName] = instanceContainer;
                         return true;
                     }
@@ -276,7 +314,7 @@ namespace FeatureLoom.DependencyInversion
                 // Try to create a new container using a creator.
                 if (!TryGetServiceInstanceCreatorUnsafe<T>(out IServiceInstanceCreator creator)) return false;
                 instanceContainer = new Service<T>.ServiceInstanceContainer(creator, serviceInstanceName);
-                if (localInstancesForAllServicesActive) instanceContainer.EnableLocalServiceInstances();
+                if (localScopeStorageEnabled) instanceContainer.EnableLocalServiceInstances();
                 services[typeAndName] = instanceContainer;
                 return true;
             }

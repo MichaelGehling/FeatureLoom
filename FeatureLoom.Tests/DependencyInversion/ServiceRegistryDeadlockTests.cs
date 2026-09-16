@@ -31,6 +31,24 @@ public class ServiceRegistryDeadlockTests
     [InlineData(nameof(ServiceRegistryTestProcess.CompletedLocalCanBecomeGlobal))]
     [InlineData(nameof(ServiceRegistryTestProcess.ClearedActivationCannotOverwriteReactivation))]
     [InlineData(nameof(ServiceRegistryTestProcess.LocalFactoryCycleThrowsAndCanRecover))]
+    [InlineData(nameof(ServiceRegistryTestProcess.LateUnnamedResolutionSharesScope))]
+    [InlineData(nameof(ServiceRegistryTestProcess.LateNamedResolutionSharesScope))]
+    [InlineData(nameof(ServiceRegistryTestProcess.ConcurrentLateResolutionSharesScope))]
+    [InlineData(nameof(ServiceRegistryTestProcess.LateAssignmentSharesScope))]
+    [InlineData(nameof(ServiceRegistryTestProcess.LateAliasSharesScope))]
+    [InlineData(nameof(ServiceRegistryTestProcess.SeparateScopesForLateRegistrations))]
+    [InlineData(nameof(ServiceRegistryTestProcess.CurrentClearLeavesOtherScopes))]
+    [InlineData(nameof(ServiceRegistryTestProcess.CurrentClearFromChildClosesSharedScope))]
+    [InlineData(nameof(ServiceRegistryTestProcess.PromotionLeavesOtherScopes))]
+    [InlineData(nameof(ServiceRegistryTestProcess.ManualOverridesInsideScopeStayContextLocal))]
+    [InlineData(nameof(ServiceRegistryTestProcess.LateContainerRegisteredOutsideScope))]
+    [InlineData(nameof(ServiceRegistryTestProcess.ExplicitAllContextsClearClosesOtherScopes))]
+    [InlineData(nameof(ServiceRegistryTestProcess.ExplicitAllContextsPromotionUsesCallerValues))]
+    [InlineData(nameof(ServiceRegistryTestProcess.ServiceClearLeavesOtherScopes))]
+    [InlineData(nameof(ServiceRegistryTestProcess.ServiceClearAllContextsLeavesOtherServices))]
+    [InlineData(nameof(ServiceRegistryTestProcess.LateFactoryFailureCanRetryInParent))]
+    [InlineData(nameof(ServiceRegistryTestProcess.CurrentClearDiscardsLateFactoryResult))]
+    [InlineData(nameof(ServiceRegistryTestProcess.ClearedAliasDoesNotPublishScopedSourceAsGlobal))]
     public async Task ScenarioCompletesInIsolatedProcess(string scenario)
     {
         var workingDirectory = Path.Combine(Path.GetTempPath(), nameof(ServiceRegistryDeadlockTests), Guid.NewGuid().ToString("N"));
@@ -75,7 +93,7 @@ public class ServiceRegistryDeadlockTests
     }
 }
 
-internal static class ServiceRegistryTestProcess
+internal static partial class ServiceRegistryTestProcess
 {
     private interface IConsumer { }
     private sealed class Consumer : IConsumer
@@ -231,7 +249,7 @@ internal static class ServiceRegistryTestProcess
     {
         WithBlockedActivation((global, release) =>
         {
-            ServiceRegistry.ClearAllLocalServiceInstances(promote);
+            ServiceRegistry.ClearAllLocalServiceInstances(promote, allContexts: true);
             release.Set();
             Assert.False(ServiceRegistry.LocalInstancesForAllServicesActive);
             Assert.False(Assert.Single(ServiceRegistry.GetAllRegisteredServices()).UsesLocalInstance);
@@ -245,6 +263,8 @@ internal static class ServiceRegistryTestProcess
         WithBlockedActivation((global, release) =>
         {
             Service<Consumer>.Init(_ => new Consumer(null));
+            // Activation in another execution context no longer creates a local scope in this caller.
+            ServiceRegistry.CreateLocalInstancesForAllServices();
             var local = Service<Consumer>.Get();
             Assert.All(ServiceRegistry.GetAllRegisteredServices(), service => Assert.True(service.UsesLocalInstance));
             release.Set();
@@ -280,7 +300,7 @@ internal static class ServiceRegistryTestProcess
         var second = RunWithoutContext(Activate);
         Task.WaitAll(first, second);
         Assert.NotSame(first.Result, second.Result);
-        ServiceRegistry.ClearAllLocalServiceInstances(false);
+        ServiceRegistry.ClearAllLocalServiceInstances(false, allContexts: true);
         Assert.Same(global, Service<Dependency>.Get());
     }
 
@@ -336,7 +356,7 @@ internal static class ServiceRegistryTestProcess
         Dependency replacement = null;
         WithBlockedActivation((global, release) =>
         {
-            ServiceRegistry.ClearAllLocalServiceInstances(false);
+            ServiceRegistry.ClearAllLocalServiceInstances(false, allContexts: true);
             ServiceRegistry.CreateLocalInstancesForAllServices();
             replacement = Service<Dependency>.Get();
             Assert.NotSame(global, replacement);

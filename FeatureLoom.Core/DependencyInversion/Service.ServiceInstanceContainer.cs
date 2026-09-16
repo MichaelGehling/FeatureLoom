@@ -22,6 +22,7 @@ namespace FeatureLoom.DependencyInversion
 
             // The creator responsible for instantiating the service.
             IServiceInstanceCreator creator;
+            IPreparedServiceInstanceContainer sourceContainer;
 
             // The name associated with this service instance (for named services).
             string serviceInstanceName;
@@ -46,15 +47,23 @@ namespace FeatureLoom.DependencyInversion
             /// </summary>
             /// <param name="container">The source container to copy from.</param>
             /// <param name="serviceInstanceName">The name of the service instance.</param>
-            internal ServiceInstanceContainer(IServiceInstanceContainer container, string serviceInstanceName)
+            internal ServiceInstanceContainer(IPreparedServiceInstanceContainer container, string serviceInstanceName)
             {
                 this.serviceInstanceName = serviceInstanceName;
 
                 if (!typeof(T).IsAssignableFrom(container.ServiceType)) throw new Exception("Incompatible ServiceInstanceContainer used!");
                 creator = container.ServiceInstanceCreator;
+                sourceContainer = container;
                 globalInstance = container.GlobalInstance as T;
                 // The source's Instance getter may run a factory. Defer it until after registry publication.
-                if (container.UsesLocalInstance) localInstance.Obj.Value = new LocalInstance(() => container.Instance as T);
+                if (container.UsesLocalInstance)
+                {
+                    var scope = ServiceRegistry.CurrentLocalScope;
+                    var localInstances = localInstance.Obj;
+                    var local = new LocalInstance(CreateInstance, scope: scope);
+                    if (scope != null) scope.Set(localInstances, local);
+                    else localInstances.Value = local;
+                }
             }
 
             /// <summary>
@@ -70,7 +79,17 @@ namespace FeatureLoom.DependencyInversion
             /// <summary>
             /// Gets whether this container is currently using a local (contextual) instance.
             /// </summary>
-            public bool UsesLocalInstance => localInstance.Exists;
+            public bool UsesLocalInstance
+            {
+                get
+                {
+                    var localInstances = localInstance.ObjIfExists;
+                    if (localInstances == null) return false;
+                    var scope = ServiceRegistry.CurrentLocalScope;
+                    var local = GetExistingLocalInstance(localInstances, scope);
+                    return local != LocalInstance.Cleared && (local != null || scope != null);
+                }
+            }
 
             /// <summary>
             /// Gets the global (shared) instance as an object.
@@ -87,35 +106,67 @@ namespace FeatureLoom.DependencyInversion
                 get
                 {
                     var localInstances = localInstance.ObjIfExists;
-                    if (localInstances == null)
+                    if (localInstances != null)
                     {
-                        if (globalInstance != null) return globalInstance;
-                        using (creationLock.Lock())
+                        var scope = ServiceRegistry.CurrentLocalScope;
+                        var local = GetExistingLocalInstance(localInstances, scope);
+                        if (local == null && scope != null)
                         {
-                            if (globalInstance != null) return globalInstance;
-                            globalInstance = creator.CreateServiceInstance<T>(serviceInstanceName);
-                            return globalInstance;
+                            // Publish the holder in the shared scope before invoking its factory.
+                            local = scope.GetOrAdd(localInstances, new LocalInstance(CreateInstance, scope: scope));
                         }
+                        if (local != null && local != LocalInstance.Cleared) return local.Instance;
                     }
-                    else
-                    {
-                        var local = localInstances.Value;
-                        if (local == null)
-                        {
-                            // Manual local overrides retain global fallback in other contexts; global local-mode does not.
-                            var fallback = ServiceRegistry.LocalInstancesForAllServicesActive ? null : globalInstance;
-                            local = new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName), fallback);
-                            localInstances.Value = local;
-                        }
-                        return local.Instance;
-                    }
+                    if (globalInstance != null) return globalInstance;
+                    return GetGlobalInstance();
                 }
                 set
                 {
                     var localInstances = localInstance.ObjIfExists;
-                    if (localInstances != null) localInstances.Value = value == null ? null : new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName), value);
-                    else globalInstance = value;
+                    if (localInstances != null)
+                    {
+                        var scope = ServiceRegistry.CurrentLocalScope;
+                        var localOverride = localInstances.Value;
+                        if (localOverride != null && ReferenceEquals(localOverride.Scope, scope))
+                        {
+                            localInstances.Value = value == null ? null : new LocalInstance(CreateInstance, value, scope);
+                            return;
+                        }
+                        if (scope != null)
+                        {
+                            scope.Set(localInstances, new LocalInstance(CreateInstance, value, scope));
+                            return;
+                        }
+                    }
+                    globalInstance = value;
                 }
+            }
+
+            object IPreparedServiceInstanceContainer.GetGlobalInstance() => GetGlobalInstance();
+
+            private T GetGlobalInstance()
+            {
+                if (globalInstance != null) return globalInstance;
+                using (creationLock.Lock())
+                {
+                    if (globalInstance != null) return globalInstance;
+                    // An alias falling back to global must not capture its source's active local instance.
+                    globalInstance = sourceContainer != null
+                        ? (T)sourceContainer.GetGlobalInstance()
+                        : creator.CreateServiceInstance<T>(serviceInstanceName);
+                    return globalInstance;
+                }
+            }
+
+            private T CreateInstance() => sourceContainer != null
+                ? (T)sourceContainer.Instance
+                : creator.CreateServiceInstance<T>(serviceInstanceName);
+
+            private LocalInstance GetExistingLocalInstance(AsyncLocal<LocalInstance> localInstances, LocalServiceScope scope)
+            {
+                var localOverride = localInstances.Value;
+                if (localOverride != null && ReferenceEquals(localOverride.Scope, scope)) return localOverride;
+                return scope != null && scope.TryGet<LocalInstance>(localInstances, out var local) ? local : null;
             }
 
             /// <summary>
@@ -124,7 +175,8 @@ namespace FeatureLoom.DependencyInversion
             /// <param name="localServiceInstance">The instance to use, or null to create a new one.</param>
             public void CreateLocalServiceInstance(T localServiceInstance = null)
             {
-                var local = new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName), localServiceInstance);
+                var local = new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName), localServiceInstance,
+                    ServiceRegistry.CurrentLocalScope);
                 localInstance.Obj.Value = local;
                 _ = local.Instance;
             }
@@ -144,41 +196,57 @@ namespace FeatureLoom.DependencyInversion
 
             public Action PrepareLocalServiceInstance()
             {
+                var scope = ServiceRegistry.CurrentLocalScope;
                 var localInstances = localInstance.Obj;
-                var local = new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName));
-                localInstances.Value = local;
+                var local = new LocalInstance(CreateInstance, scope: scope);
+                scope.Set(localInstances, local);
                 return () =>
                 {
-                    // Clearing detaches the holder; another activation in this context replaces the slot.
-                    if (ReferenceEquals(localInstance.ObjIfExists, localInstances) && ReferenceEquals(localInstances.Value, local))
+                    // Clearing closes the scope or detaches storage; explicit overrides can replace this slot.
+                    if (scope.IsActive && ReferenceEquals(ServiceRegistry.CurrentLocalScope, scope) &&
+                        ReferenceEquals(localInstance.ObjIfExists, localInstances) &&
+                        ReferenceEquals(GetExistingLocalInstance(localInstances, scope), local))
                         _ = local.Instance;
                 };
             }
 
             /// <summary>
-            /// Clears all local (contextual) service instances.
+            /// Clears this service in the current scope and removes the current context's explicit override.
             /// Optionally sets the global instance to the current context's completed local instance.
             /// Pending or failed initialization does not replace the global instance.
             /// </summary>
             /// <param name="useLocalInstanceAsGlobal">If true, sets the global instance to the local instance before clearing.</param>
             public void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
             {
-                var localInstances = localInstance.ExchangeObj(null);
-                var completedInstance = localInstances?.Value?.ExistingInstance;
+                ClearAllLocalServiceInstances(useLocalInstanceAsGlobal, false);
+            }
+
+            public void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal, bool allContexts)
+            {
+                var scope = ServiceRegistry.CurrentLocalScope;
+                var localInstances = allContexts ? localInstance.ExchangeObj(null) : localInstance.ObjIfExists;
+                if (localInstances == null) return;
+                var completedInstance = GetExistingLocalInstance(localInstances, scope)?.ExistingInstance;
                 if (useLocalInstanceAsGlobal && completedInstance != null) globalInstance = completedInstance;
+                localInstances.Value = null;
+                if (!allContexts && scope != null) scope.Set(localInstances, LocalInstance.Cleared);
             }
 
             private sealed class LocalInstance
             {
+                public static readonly LocalInstance Cleared = new LocalInstance(null);
                 private readonly Func<T> create;
                 private readonly object sync = new object();
                 private T instance;
                 private bool creating;
 
-                public LocalInstance(Func<T> create, T instance = null)
+                public LocalServiceScope Scope { get; }
+
+                public LocalInstance(Func<T> create, T instance = null, LocalServiceScope scope = null)
                 {
                     this.create = create;
                     this.instance = instance;
+                    Scope = scope;
                 }
 
                 public T ExistingInstance => Volatile.Read(ref instance);
