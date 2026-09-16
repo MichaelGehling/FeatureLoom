@@ -16,6 +16,22 @@ namespace FeatureLoom.Helpers;
 /// </list>
 /// </para>
 /// </summary>
+/// <remarks>
+/// <para>
+/// Reads acquire a snapshot of the stored reference; assignments publish it with release semantics.
+/// Concurrent initializers may run multiple constructors, but return the same published instance unless
+/// replacement or removal intervenes. Unpublished candidates are not disposed by this wrapper.
+/// </para>
+/// <para>
+/// Removal and replacement do not cancel a constructor already running. An overlapping access may
+/// return a detached instance, or publish a new instance after removal. Snapshots do not reserve the value
+/// for subsequent operations, and the wrapped object's own operations are not synchronized.
+/// </para>
+/// <para>
+/// This is a mutable struct: copies have independent storage. Use a shared, non-readonly field when
+/// initialization must be retained; value copies and readonly receivers can initialize only a copy.
+/// </para>
+/// </remarks>
 /// <typeparam name="T">Reference type with a public parameterless constructor.</typeparam>
 public struct LazyValue<T> where T : class, new()
 {
@@ -35,32 +51,43 @@ public struct LazyValue<T> where T : class, new()
     /// </summary>
     public T Obj
     {
-        get => obj ?? Create();
-        set => obj = value;
+        get => Volatile.Read(ref obj) ?? Create();
+        set => Volatile.Write(ref obj, value);
     }
 
     /// <summary>
-    /// Gets the value if it exists, or <c>null</c> if it has not been created.
+    /// Gets a snapshot of the stored reference without creating it, or <c>null</c> if none is stored.
     /// </summary>
-    public T ObjIfExists => obj;
+    public T ObjIfExists => Volatile.Read(ref obj);
 
     /// <summary>
-    /// Indicates whether the value has been created.
+    /// Gets a snapshot indicating whether a non-null reference is currently stored.
     /// </summary>
-    public bool Exists => obj != null;
+    public bool Exists => Volatile.Read(ref obj) != null;
 
     /// <summary>
-    /// Removes the current value, allowing it to be re-initialized on next access.
+    /// Atomically removes the current value without disposing it. An overlapping or later access may initialize it again.
     /// </summary>
     public void RemoveObj()
     {
-        obj = default;
+        ExchangeObj(null);
+    }
+
+    /// <summary>
+    /// Atomically replaces the stored reference and returns the previous reference without constructing or disposing either value.
+    /// </summary>
+    /// <param name="value">The replacement reference, or <c>null</c> to remove the stored reference.</param>
+    /// <returns>The reference stored immediately before the exchange, or <c>null</c> if none was stored.</returns>
+    public T ExchangeObj(T value)
+    {
+        return Interlocked.Exchange(ref obj, value);
     }
 
     private T Create()
     {
-        Interlocked.CompareExchange(ref obj, new T(), null);
-        return obj;
+        var candidate = new T();
+        // A separate field read could observe a concurrent removal instead of the publication result.
+        return Interlocked.CompareExchange(ref obj, candidate, null) ?? candidate;
     }
 
     /// <summary>

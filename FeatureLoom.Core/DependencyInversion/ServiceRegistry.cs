@@ -19,7 +19,7 @@ namespace FeatureLoom.DependencyInversion
     public static class ServiceRegistry
     {
         // Stores all registered service instance containers, keyed by type and name.
-        static Dictionary<TypeAndName, IServiceInstanceContainer> services = new Dictionary<TypeAndName, IServiceInstanceContainer>();
+        static Dictionary<TypeAndName, IPreparedServiceInstanceContainer> services = new Dictionary<TypeAndName, IPreparedServiceInstanceContainer>();
 
         // Stores all registered service instance creators, keyed by service type.
         static Dictionary<Type, IServiceInstanceCreator> creators = new Dictionary<Type, IServiceInstanceCreator>();
@@ -28,7 +28,7 @@ namespace FeatureLoom.DependencyInversion
         static MicroLock registryLock = new MicroLock();
 
         // Indicates if local (contextual) instances are active for all services.
-        static bool localInstancesForAllServicesActive = false;
+        static volatile bool localInstancesForAllServicesActive = false;
 
         /// <summary>
         /// Gets or sets whether the registry is allowed to search all loaded assemblies for a suitable implementation
@@ -46,11 +46,11 @@ namespace FeatureLoom.DependencyInversion
         /// If local instances are globally active, ensures the container uses a local instance.
         /// </summary>
         /// <param name="service">The service instance container to register.</param>
-        internal static void RegisterService(IServiceInstanceContainer service)
+        internal static void RegisterService(IPreparedServiceInstanceContainer service)
         {
             using (registryLock.Lock())
             {
-                if (localInstancesForAllServicesActive && !service.UsesLocalInstance) service.CreateLocalServiceInstance();
+                if (localInstancesForAllServicesActive) service.EnableLocalServiceInstances();
                 services[service.GetTypeAndName()] = service;
             }
         }
@@ -89,7 +89,7 @@ namespace FeatureLoom.DependencyInversion
         {
             using (registryLock.Lock())
             {
-                return services.Values.ToArray();
+                return services.Values.ToArray<IServiceInstanceContainer>();
             }
         }
 
@@ -119,17 +119,25 @@ namespace FeatureLoom.DependencyInversion
 
         /// <summary>
         /// Activates local (contextual) instances for all registered services.
+        /// Prepares all current-context slots before constructing services, so dependencies use the new local instances.
+        /// Concurrent clearing discards pending local instances; construction already in progress may still complete.
         /// </summary>
         public static void CreateLocalInstancesForAllServices()
         {
+            Action[] initialize;
             using (registryLock.Lock())
             {
                 localInstancesForAllServicesActive = true;
+                initialize = new Action[services.Count];
+                int index = 0;
                 foreach (var service in services.Values)
                 {
-                    service.CreateLocalServiceInstance();
+                    initialize[index++] = service.PrepareLocalServiceInstance();
                 }
             }
+
+            // Factories can resolve or register services, and must never run under the registry lock.
+            foreach (var initializeService in initialize) initializeService();
         }
 
         /// <summary>
@@ -246,7 +254,7 @@ namespace FeatureLoom.DependencyInversion
             using (registryLock.Lock())
             {
                 // Try to find an exact match.
-                if (services.TryGetValue(typeAndName, out IServiceInstanceContainer container) && container is Service<T>.ServiceInstanceContainer typedContainer)
+                if (services.TryGetValue(typeAndName, out var container) && container is Service<T>.ServiceInstanceContainer typedContainer)
                 {
                     instanceContainer = typedContainer;
                     return true;
@@ -259,6 +267,7 @@ namespace FeatureLoom.DependencyInversion
                         otherService.ServiceInstanceName == serviceInstanceName)
                     {
                         instanceContainer = new Service<T>.ServiceInstanceContainer(otherService, serviceInstanceName);
+                        if (localInstancesForAllServicesActive) instanceContainer.EnableLocalServiceInstances();
                         services[typeAndName] = instanceContainer;
                         return true;
                     }
@@ -267,6 +276,7 @@ namespace FeatureLoom.DependencyInversion
                 // Try to create a new container using a creator.
                 if (!TryGetServiceInstanceCreatorUnsafe<T>(out IServiceInstanceCreator creator)) return false;
                 instanceContainer = new Service<T>.ServiceInstanceContainer(creator, serviceInstanceName);
+                if (localInstancesForAllServicesActive) instanceContainer.EnableLocalServiceInstances();
                 services[typeAndName] = instanceContainer;
                 return true;
             }

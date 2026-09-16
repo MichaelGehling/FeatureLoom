@@ -1,7 +1,7 @@
 # Copilot Instructions
 
-FeatureLoom — a multi-target .NET utility library (.NET Framework 4.8, netstandard2.0/2.1, .NET 8, .NET 10).
-Solution: `FeatureProjects.sln`.
+FeatureLoom — a multi-target .NET utility library (.NET Framework 4.8, netstandard2.0/2.1, .NET 8, .NET 10).  
+Solution: `FeatureProjects.sln`.  
 
 | Project | Role |
 |---|---|
@@ -36,6 +36,9 @@ Solution: `FeatureProjects.sln`.
 - Prefer one targeted benchmark/test run over broad repeated runs.
 
 ## Topic instructions
-Detailed rules live in `.github/skills/` and load automatically by file scope:
-`csharp` · `json-serialization` · `optimization` · `testing`
+Detailed rules live in `.github/skills/` and load automatically by file scope:  
+`csharp` · `json-serialization` · `optimization` · `testing`  
 - Update the instructions if you find them incomplete or unclear. Add a new topic if needed.
+
+## Performance Considerations
+- FeatureLoom's `Service<T>.Instance/Get` accessors are intended to be nearly free on the steady-state path, without requiring callers to cache the service reference except in very hot loops. Be mindful of synchronization changes that may introduce access overhead.

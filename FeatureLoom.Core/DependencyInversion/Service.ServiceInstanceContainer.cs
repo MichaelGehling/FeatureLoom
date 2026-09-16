@@ -12,13 +12,13 @@ namespace FeatureLoom.DependencyInversion
         /// Supports both global (shared) and local (contextual, e.g. per-thread or per-async-context) instances.
         /// Handles instance creation, retrieval, and switching between global and local instances.
         /// </summary>
-        internal class ServiceInstanceContainer : IServiceInstanceContainer
+        internal class ServiceInstanceContainer : IPreparedServiceInstanceContainer
         {
             // Holds the global (shared) instance of the service.
             T globalInstance;
 
             // Holds the local (contextual) instance, e.g. per-thread or per-async-context.
-            LazyValue<AsyncLocal<T>> localInstance;
+            LazyValue<AsyncLocal<LocalInstance>> localInstance;
 
             // The creator responsible for instantiating the service.
             IServiceInstanceCreator creator;
@@ -53,7 +53,8 @@ namespace FeatureLoom.DependencyInversion
                 if (!typeof(T).IsAssignableFrom(container.ServiceType)) throw new Exception("Incompatible ServiceInstanceContainer used!");
                 creator = container.ServiceInstanceCreator;
                 globalInstance = container.GlobalInstance as T;
-                if (container.UsesLocalInstance) CreateLocalServiceInstance(container.Instance as T);
+                // The source's Instance getter may run a factory. Defer it until after registry publication.
+                if (container.UsesLocalInstance) localInstance.Obj.Value = new LocalInstance(() => container.Instance as T);
             }
 
             /// <summary>
@@ -85,7 +86,8 @@ namespace FeatureLoom.DependencyInversion
             {
                 get
                 {
-                    if (!localInstance.Exists)
+                    var localInstances = localInstance.ObjIfExists;
+                    if (localInstances == null)
                     {
                         if (globalInstance != null) return globalInstance;
                         using (creationLock.Lock())
@@ -97,23 +99,21 @@ namespace FeatureLoom.DependencyInversion
                     }
                     else
                     {
-                        T instance = localInstance.Obj.Value;
-                        if (instance != null) return instance;
-                        using (creationLock.Lock())
+                        var local = localInstances.Value;
+                        if (local == null)
                         {
-                            instance = localInstance.Obj.Value;
-                            if (instance != null) return instance;
-
-                            if (globalInstance != null) instance = globalInstance;
-                            else instance = creator.CreateServiceInstance<T>(serviceInstanceName);
-                            localInstance.Obj.Value = instance;
-                            return instance;
+                            // Manual local overrides retain global fallback in other contexts; global local-mode does not.
+                            var fallback = ServiceRegistry.LocalInstancesForAllServicesActive ? null : globalInstance;
+                            local = new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName), fallback);
+                            localInstances.Value = local;
                         }
+                        return local.Instance;
                     }
                 }
                 set
                 {
-                    if (localInstance.Exists) localInstance.Obj.Value = value;
+                    var localInstances = localInstance.ObjIfExists;
+                    if (localInstances != null) localInstances.Value = value == null ? null : new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName), value);
                     else globalInstance = value;
                 }
             }
@@ -124,7 +124,9 @@ namespace FeatureLoom.DependencyInversion
             /// <param name="localServiceInstance">The instance to use, or null to create a new one.</param>
             public void CreateLocalServiceInstance(T localServiceInstance = null)
             {
-                localInstance.Obj.Value = localServiceInstance ?? creator.CreateServiceInstance<T>();
+                var local = new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName), localServiceInstance);
+                localInstance.Obj.Value = local;
+                _ = local.Instance;
             }
 
             /// <summary>
@@ -132,18 +134,80 @@ namespace FeatureLoom.DependencyInversion
             /// </summary>
             public void CreateLocalServiceInstance()
             {
-                localInstance.Obj.Value = creator.CreateServiceInstance<T>();
+                CreateLocalServiceInstance(null);
+            }
+
+            public void EnableLocalServiceInstances()
+            {
+                _ = localInstance.Obj;
+            }
+
+            public Action PrepareLocalServiceInstance()
+            {
+                var localInstances = localInstance.Obj;
+                var local = new LocalInstance(() => creator.CreateServiceInstance<T>(serviceInstanceName));
+                localInstances.Value = local;
+                return () =>
+                {
+                    // Clearing detaches the holder; another activation in this context replaces the slot.
+                    if (ReferenceEquals(localInstance.ObjIfExists, localInstances) && ReferenceEquals(localInstances.Value, local))
+                        _ = local.Instance;
+                };
             }
 
             /// <summary>
             /// Clears all local (contextual) service instances.
-            /// Optionally sets the global instance to the last local instance.
+            /// Optionally sets the global instance to the current context's completed local instance.
+            /// Pending or failed initialization does not replace the global instance.
             /// </summary>
             /// <param name="useLocalInstanceAsGlobal">If true, sets the global instance to the local instance before clearing.</param>
             public void ClearAllLocalServiceInstances(bool useLocalInstanceAsGlobal)
             {
-                if (localInstance.Exists && useLocalInstanceAsGlobal) globalInstance = localInstance.Obj.Value;
-                localInstance.RemoveObj();
+                var localInstances = localInstance.ExchangeObj(null);
+                var completedInstance = localInstances?.Value?.ExistingInstance;
+                if (useLocalInstanceAsGlobal && completedInstance != null) globalInstance = completedInstance;
+            }
+
+            private sealed class LocalInstance
+            {
+                private readonly Func<T> create;
+                private readonly object sync = new object();
+                private T instance;
+                private bool creating;
+
+                public LocalInstance(Func<T> create, T instance = null)
+                {
+                    this.create = create;
+                    this.instance = instance;
+                }
+
+                public T ExistingInstance => Volatile.Read(ref instance);
+
+                public T Instance
+                {
+                    get
+                    {
+                        var value = ExistingInstance;
+                        if (value != null) return value;
+                        lock (sync)
+                        {
+                            if (instance != null) return instance;
+                            if (creating) throw new InvalidOperationException($"Circular local service initialization for {typeof(T)}.");
+                            creating = true;
+                            try
+                            {
+                                value = create();
+                                Volatile.Write(ref instance, value);
+                                return value;
+                            }
+                            finally
+                            {
+                                // Failed factories can be retried without falling back to an old global instance.
+                                creating = false;
+                            }
+                        }
+                    }
+                }
             }
 
             /// <summary>

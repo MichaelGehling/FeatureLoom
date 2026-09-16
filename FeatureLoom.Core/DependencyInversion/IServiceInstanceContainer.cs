@@ -13,4 +13,11 @@ namespace FeatureLoom.DependencyInversion
         string ServiceInstanceName { get; }
         IServiceInstanceCreator ServiceInstanceCreator { get; }
     }    
+
+    // Preparation only changes metadata; the returned action may execute a service factory.
+    internal interface IPreparedServiceInstanceContainer : IServiceInstanceContainer
+    {
+        void EnableLocalServiceInstances();
+        Action PrepareLocalServiceInstance();
+    }
 }

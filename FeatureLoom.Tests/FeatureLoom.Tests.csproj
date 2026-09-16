@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <StartupObject>FeatureLoom.DependencyInversion.ServiceRegistryTestProcess</StartupObject>
 
     <IsPackable>false</IsPackable>
 
