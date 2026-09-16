@@ -388,11 +388,11 @@ public sealed class QueueReceiver<T> : IReceiver<T>, IAlternativeMessageSource, 
     /// <returns>An <see cref="ArraySegment{T}"/> containing the dequeued items.</returns>
     public ArraySegment<T> ReceiveMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
     {            
-        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
+        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>(Array.Empty<T>());
         ArraySegment<T> items;
         using (queueLock.Lock(true))
         {
-            if (IsEmpty) return new ArraySegment<T>();
+            if (IsEmpty) return new ArraySegment<T>(Array.Empty<T>());
 
             if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
             var numItems = maxItems.ClampHigh(Count);
@@ -424,11 +424,11 @@ public sealed class QueueReceiver<T> : IReceiver<T>, IAlternativeMessageSource, 
     /// <returns>An <see cref="ArraySegment{T}"/> containing the peeked items.</returns>
     public ArraySegment<T> PeekMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
     {
-        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
+        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>(Array.Empty<T>());
         ArraySegment<T> items;
         using (queueLock.LockReadOnly(true))
         {
-            if (IsEmpty) return new ArraySegment<T>();
+            if (IsEmpty) return new ArraySegment<T>(Array.Empty<T>());
 
             if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
             var numItems = maxItems.ClampHigh(Count);

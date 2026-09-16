@@ -93,7 +93,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     /// </summary>
     public ArraySegment<T> PeekMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
     {
-        if (ResetWakeEventIfEmpty() || maxItems <= 0) return new ArraySegment<T>();
+        if (ResetWakeEventIfEmpty() || maxItems <= 0) return new ArraySegment<T>(Array.Empty<T>());
         if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
 
         if (remainingBuffer.Count == 0)
@@ -127,10 +127,10 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     /// </summary>
     public ArraySegment<T> ReceiveMany(int maxItems = 0, SlicedBuffer<T> slicedBuffer = null)
     {
-        if (ResetWakeEventIfEmpty() || maxItems <= 0) return new ArraySegment<T>();
+        if (ResetWakeEventIfEmpty() || maxItems <= 0) return new ArraySegment<T>(Array.Empty<T>());
         if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
 
-        ArraySegment<T> readItems = new ArraySegment<T>();
+        ArraySegment<T> readItems = new ArraySegment<T>(Array.Empty<T>());
         if (remainingBuffer.Count == 0)
         {
             readItems = receiver.ReceiveMany(maxItems, slicedBuffer);
@@ -145,7 +145,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
         {
             readItems = slicedBuffer.GetSlice(remainingBuffer.Count);
             readItems.CopyFrom(remainingBuffer, 0, remainingBuffer.Count);
-            remainingBuffer = new ArraySegment<T>();
+            remainingBuffer = new ArraySegment<T>(Array.Empty<T>());
         }
         else
         {
@@ -153,7 +153,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
             readItems = slicedBuffer.GetSlice(remainingBuffer.Count + readFromReceiver.Count);
             remainingBuffer.CopyTo(readItems.Array, readItems.Offset);
             readFromReceiver.CopyTo(readItems.Array, readItems.Offset + remainingBuffer.Count);
-            remainingBuffer = new ArraySegment<T>();
+            remainingBuffer = new ArraySegment<T>(Array.Empty<T>());
         }
         
         // Free the buffer slice if it is depleted.

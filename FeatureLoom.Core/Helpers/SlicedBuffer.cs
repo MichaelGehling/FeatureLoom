@@ -246,7 +246,7 @@ public class SlicedBuffer<T>
     public void FreeSlice(ref ArraySegment<T> slice)
     {
         if (slice.Array == this.buffer) ResizeSlice(ref slice, 0);
-        else slice = new ArraySegment<T>();
+        else slice = new ArraySegment<T>(Array.Empty<T>());
     }
 
     /// <summary>
@@ -293,7 +293,7 @@ public class SlicedBuffer<T>
             {
                 position = slice.Offset; // Reset position to the start of the slice                
             }            
-            slice = new ArraySegment<T>();
+            slice = new ArraySegment<T>(Array.Empty<T>());
         }
         else
         {

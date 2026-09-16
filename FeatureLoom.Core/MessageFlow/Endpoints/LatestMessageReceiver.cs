@@ -144,10 +144,10 @@ public sealed class LatestMessageReceiver<T> : IMessageSink<T>, IReceiver<T>, IA
     /// </summary>
     public ArraySegment<T> ReceiveMany(int maxItems = int.MaxValue, SlicedBuffer<T> slicedBuffer = null)
     {
-        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
+        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>(Array.Empty<T>());
         using (myLock.Lock(true))
         {
-            if (!hasMessage) return new ArraySegment<T>();
+            if (!hasMessage) return new ArraySegment<T>(Array.Empty<T>());
             if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
             ArraySegment<T> items = slicedBuffer.GetSlice(1);
             items.Array[items.Offset] = receivedMessage;
@@ -164,10 +164,10 @@ public sealed class LatestMessageReceiver<T> : IMessageSink<T>, IReceiver<T>, IA
     /// </summary>
     public ArraySegment<T> PeekMany(int maxItems = int.MaxValue, SlicedBuffer<T> slicedBuffer = null)
     {
-        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>();
+        if (IsEmpty || maxItems <= 0) return new ArraySegment<T>(Array.Empty<T>());
         using (myLock.Lock(true))
         {
-            if (!hasMessage) return new ArraySegment<T>();
+            if (!hasMessage) return new ArraySegment<T>(Array.Empty<T>());
             if (slicedBuffer == null) slicedBuffer = SlicedBuffer<T>.Shared;
             ArraySegment<T> items = slicedBuffer.GetSlice(1);
             items.Array[items.Offset] = receivedMessage;
