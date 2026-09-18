@@ -27,7 +27,7 @@ namespace FeatureLoom.Logging
             public string archiveFilePath = "logs/logArchive.zip";
             public int logFilesArchiveLimitInMB = 100;            
             public CompressionLevel compressionLevel = CompressionLevel.Fastest;
-            public int delayAfterWritingInMs = 1000;
+            public int delayAfterWritingInMs = 100;
             public Loglevel skipDelayLogLevel = Loglevel.ERROR;
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
