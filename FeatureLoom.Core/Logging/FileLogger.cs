@@ -31,7 +31,7 @@ namespace FeatureLoom.Logging
             public Loglevel skipDelayLogLevel = Loglevel.ERROR;
             public Loglevel logFileLoglevel = Loglevel.TRACE;
             public string logFileLogFormat = "";
-            public int maxQueueSize = 10000;
+            public int maxQueueSize = 100_000;
         }
 
         public Config config;
