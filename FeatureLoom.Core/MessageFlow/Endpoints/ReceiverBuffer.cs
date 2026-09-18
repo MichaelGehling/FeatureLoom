@@ -4,6 +4,7 @@ using FeatureLoom.Synchronization;
 using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FeatureLoom.MessageFlow;
@@ -21,8 +22,9 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     // The underlying receiver (usually a QueueReceiver).
     IReceiver<T> receiver;
 
-    // Used to signal when data is available for reading.
+    // Advisory notifications only: copied transitions must not control waiting.
     AsyncManualResetEvent readerWakeEvent = new AsyncManualResetEvent(false);
+    readonly IAsyncWaitHandle waitHandle;
 
     // The current buffer of messages available for consumption.
     ArraySegment<T> remainingBuffer = new();
@@ -42,6 +44,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     {
         this.receiver = receiver;
         this.maxBufferSize = maxBufferSize;
+        waitHandle = new BufferWaitHandle(this);
 
         // Subscribe to the underlying receiver's notifier to update the local wake event.
         receiver.Notifier.ProcessMessage<bool>(set =>
@@ -69,17 +72,21 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     public bool IsFull => receiver.IsFull;
 
     /// <summary>
-    /// Wait handle that is set when data is available for reading.
+    /// Stable wait adapter that completes immediately for local items and otherwise waits on the underlying receiver.
+    /// Native WaitHandle conversion is unsupported because neither underlying event represents both stores.
+    /// Like consumption, waiting must not run concurrently with another consumer of this buffer.
+    /// Signals may be spurious; recheck availability after waking.
     /// </summary>
-    public IAsyncWaitHandle WaitHandle => readerWakeEvent;
+    public IAsyncWaitHandle WaitHandle => waitHandle;
 
     /// <summary>
     /// Task that completes when data is available for reading.
     /// </summary>
-    public Task WaitingTask => readerWakeEvent.WaitingTask;
+    public Task WaitingTask => waitHandle.WaitingTask;
 
     /// <summary>
-    /// Notifier for data availability changes.
+    /// Advisory notifier for data availability changes. Concurrent notifications may arrive out of order;
+    /// use WaitHandle or WaitingTask for waiting rather than mirroring these notifications into another event.
     /// </summary>
     public IMessageSource<bool> Notifier => readerWakeEvent;
 
@@ -103,7 +110,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
         else if (remainingBuffer.Count >= maxItems)
         {
             var peeked = slicedBuffer.GetSlice(maxItems);
-            peeked.CopyFrom(remainingBuffer, 0, maxItems);
+            peeked.CopyFrom(remainingBuffer.Array, remainingBuffer.Offset, maxItems);
             return peeked;
         }
         else if (receiver.IsEmpty)
@@ -138,7 +145,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
         else if (remainingBuffer.Count >= maxItems)
         {
             readItems = slicedBuffer.GetSlice(maxItems);
-            readItems.CopyFrom(remainingBuffer, 0, maxItems);
+            readItems.CopyFrom(remainingBuffer.Array, remainingBuffer.Offset, maxItems);
             remainingBuffer = new ArraySegment<T>(remainingBuffer.Array, remainingBuffer.Offset + maxItems, remainingBuffer.Count - maxItems);
         }
         else if (receiver.IsEmpty)
@@ -238,7 +245,7 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
     }
 
     /// <summary>
-    /// Resets the wake event if the buffer is empty and returns whether it is empty.
+    /// Refreshes advisory availability notifications and returns whether the buffer is empty.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool ResetWakeEventIfEmpty()
@@ -250,6 +257,38 @@ public sealed class ReceiverBuffer<T> : IReceiver<T>
             isEmpty = IsEmpty;
             if (!isEmpty) readerWakeEvent.Set();
         }
+        else readerWakeEvent.Set();
         return isEmpty;
+    }
+
+    private sealed class BufferWaitHandle : IAsyncWaitHandle
+    {
+        private readonly ReceiverBuffer<T> buffer;
+        private static readonly IAsyncWaitHandle ready = new AsyncManualResetEvent(true);
+
+        public BufferWaitHandle(ReceiverBuffer<T> buffer)
+        {
+            this.buffer = buffer;
+        }
+
+        // Select on every operation so callers can safely cache this adapter across batch changes.
+        private IAsyncWaitHandle Current => buffer.remainingBuffer.Count > 0 ? ready : buffer.receiver.WaitHandle;
+
+        public Task WaitingTask => Current.WaitingTask;
+        public Task<bool> WaitAsync() => Current.WaitAsync();
+        public Task<bool> WaitAsync(TimeSpan timeout) => Current.WaitAsync(timeout);
+        public Task<bool> WaitAsync(CancellationToken cancellationToken) => Current.WaitAsync(cancellationToken);
+        public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken) => Current.WaitAsync(timeout, cancellationToken);
+        public bool Wait() => Current.Wait();
+        public bool Wait(TimeSpan timeout) => Current.Wait(timeout);
+        public bool Wait(CancellationToken cancellationToken) => Current.Wait(cancellationToken);
+        public bool Wait(TimeSpan timeout, CancellationToken cancellationToken) => Current.Wait(timeout, cancellationToken);
+        public bool WouldWait() => Current.WouldWait();
+
+        public bool TryConvertToWaitHandle(out WaitHandle waitHandle)
+        {
+            waitHandle = null;
+            return false;
+        }
     }
 }
