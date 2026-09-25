@@ -124,6 +124,9 @@ public sealed class Utf8StringCache
         // Small, inlinable gate: strings that are too long to be cached must not pay for the
         // call into the (much larger, non-inlinable) lookup/insert path.
         if (segment.Count > maxStringLength) return Utf8Converter.DecodeUtf8ToString(segment, stringBuilder);
+        // Empty segments must not be looked up: uninitialized cache entries have length 0 and a null value,
+        // so an empty key would falsely "hit" and return null.
+        if (segment.Count == 0) return string.Empty;
 
         return GetOrCreateCached(segment, stringBuilder);
     }

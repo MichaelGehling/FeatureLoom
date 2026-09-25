@@ -1846,6 +1846,27 @@ namespace FeatureLoom.Serialization
             Assert.NotSame(first.NonCached, second.NonCached);
         }
 
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Settings_UseStringCache_EmptyString_IsNotDeserializedAsNull(bool useStringCache)
+        {
+            var deserializer = new JsonDeserializer(new JsonDeserializer.Settings { useStringCache = useStringCache });
+
+            Assert.True(deserializer.TryDeserialize("\"\"", out string topLevel));
+            Assert.Equal(string.Empty, topLevel);
+
+            Assert.True(deserializer.TryDeserialize("{\"CachedByGlobal\":\"\",\"NonCached\":\"\"}", out StringCacheMemberSample obj));
+            Assert.Equal(string.Empty, obj.CachedByGlobal);
+            Assert.Equal(string.Empty, obj.NonCached);
+
+            Assert.True(deserializer.TryDeserialize("[\"\",\"a\",\"\"]", out string[] array));
+            Assert.Equal(new[] { "", "a", "" }, array);
+
+            Assert.True(deserializer.TryDeserialize("[\"\",\"a\",\"\"]", out List<string> list));
+            Assert.Equal(new List<string> { "", "a", "" }, list);
+        }
+
         [Fact]
         public void Settings_MemberSetUseStringCache_True_EnablesCache_ForThatMember_WhenGlobalFalse()
         {
