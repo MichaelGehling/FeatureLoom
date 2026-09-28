@@ -243,6 +243,10 @@ public sealed partial class JsonDeserializer
                 if (!itemType.IsNullable()) return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateEnumReader), [ itemType ], typeSettings);
                 else return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateNullableEnumReader), [ Nullable.GetUnderlyingType(itemType) ], typeSettings);
             }
+            else if (Nullable.GetUnderlyingType(itemType) is Type underlyingType)
+            {
+                return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateNullableStructReader), [ underlyingType ], typeSettings);
+            }
             else if (itemType == typeof(object)) return CreateUnknownObjectReader(typeSettings);
             else if (TryCreateDictionaryTypeReader(itemType, cachedTypeReader, out TypeReaderInitializer initializer)) return initializer;
             else if (TryCreateEnumerableTypeReader(itemType, cachedTypeReader, out initializer)) return initializer;
@@ -487,6 +491,23 @@ public sealed partial class JsonDeserializer
             }
         };
         return TypeReaderInitializer.Create(this, reader, null, false, cachedTypeReader.TypeSettings);
+    }
+
+    /// <summary>
+    /// Reads a nullable of a non-intrinsic struct by delegating to the reader of the underlying type.
+    /// Delegating (instead of looking up the underlying type's settings for the nullable type) keeps
+    /// the settings of the underlying type, e.g. a custom reader or constructor, valid for T? as well,
+    /// mirroring the serializer where ConfigureType&lt;T&gt;() also applies to T?.
+    /// </summary>
+    private TypeReaderInitializer CreateNullableStructReader<T>(BaseTypeSettings typeSettings) where T : struct
+    {
+        CachedTypeReader underlyingReader = GetCachedTypeReader(typeof(T));
+        var reader = () =>
+        {
+            if (TryReadNullValue()) return (T?)null;
+            return (T?)underlyingReader.ReadValue_CheckProposed<T>();
+        };
+        return TypeReaderInitializer.Create(this, reader, null, underlyingReader.WriteRefPath, typeSettings);
     }
 
     private TypeReaderInitializer CreateEnumReader<T>(BaseTypeSettings typeSettings) where T : struct, Enum
