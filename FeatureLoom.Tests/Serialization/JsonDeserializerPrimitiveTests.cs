@@ -703,6 +703,8 @@ namespace FeatureLoom.Serialization
             Assert.Null(value);
         }
 
+        // System.DateOnly/TimeOnly are only recognized by the net8.0+ Core build.
+#if !CORE_NETSTANDARD2_0 && !CORE_NETSTANDARD2_1
         [Theory]
         [InlineData("\"0001-01-01\"", "0001-01-01")]
         [InlineData("\"2024-01-02\"", "2024-01-02")]
@@ -765,6 +767,7 @@ namespace FeatureLoom.Serialization
             Assert.True(deserializer.TryDeserialize("\"\"", out TimeOnly? value));
             Assert.Null(value);
         }
+#endif
 
         private static void AssertNotDeserialized<T>(string json)
         {

@@ -309,7 +309,7 @@ public class TextSegmentTests
         Assert.Equal("cde", seg.ToString());
     }
 
-#if !NETSTANDARD2_0
+#if !CORE_NETSTANDARD2_0
     [Fact]
     public void AsSpan_Works()
     {

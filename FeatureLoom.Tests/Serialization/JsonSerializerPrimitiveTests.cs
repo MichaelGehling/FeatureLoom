@@ -269,6 +269,8 @@ namespace FeatureLoom.Serialization
         [InlineData(1.012345678901234d, "1.012345678901234")]
         [InlineData(0.1d, "0.1")]
         [InlineData(0.01234d, "0.01234")]
+        [InlineData(0.0001d, "0.0001")]
+        [InlineData(0.00012d, "0.00012")]
         [InlineData(0.00001d, "1E-05")]
         [InlineData(-0.00015890432405285535d, "-0.00015890432405285535")]
         [InlineData(0.100001d, "0.100001")]
@@ -282,6 +284,10 @@ namespace FeatureLoom.Serialization
         [Theory]
         [InlineData(1e20d, "1E+20")]
         [InlineData(1e-6d, "1E-06")]
+        [InlineData(1.5e-5d, "1.5E-05")]
+        [InlineData(5e-5d, "5E-05")]
+        [InlineData(9.9e-5d, "9.9E-05")]
+        [InlineData(-5e-5d, "-5E-05")]
         [InlineData(1e15d, "1E+15")]
         [InlineData(1.23e15d, "1.23E+15")]
         public void Serialize_Double_ExponentNotation(double value, string expected)
@@ -549,6 +555,8 @@ namespace FeatureLoom.Serialization
             AssertSerialized(value, expected);
         }
 
+        // System.DateOnly/TimeOnly are only recognized by the net8.0+ Core build.
+#if !CORE_NETSTANDARD2_0 && !CORE_NETSTANDARD2_1
         [Theory]
         [InlineData("0001-01-01", "\"0001-01-01\"")]
         [InlineData("2024-01-02", "\"2024-01-02\"")]
@@ -595,6 +603,7 @@ namespace FeatureLoom.Serialization
             TimeOnly? value = valueText == null ? null : TimeOnly.Parse(valueText, CultureInfo.InvariantCulture);
             AssertSerialized(value, expected);
         }
+#endif
 
         [Fact]
         public void Serialize_Uri_UsesOriginalString()

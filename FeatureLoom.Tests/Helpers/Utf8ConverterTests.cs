@@ -318,7 +318,7 @@ namespace FeatureLoom.Helpers
             Assert.Equal(input, result);
         }
 
-#if NETSTANDARD2_1_OR_GREATER || NET5_0_OR_GREATER
+#if !CORE_NETSTANDARD2_0
         [Fact]
         public void DecodeUtf8ToSpanOfChars_ReturnsCorrectSpan()
         {

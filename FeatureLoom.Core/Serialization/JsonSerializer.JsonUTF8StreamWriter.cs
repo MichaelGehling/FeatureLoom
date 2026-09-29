@@ -3314,7 +3314,8 @@ public sealed partial class JsonSerializer
 
         double CalculateNumDigits(double value, out int exponent, out int numIntegralDigits, out int numFractionalDigits, out bool printExponent, out bool failed, int MAX_SIGNIFICANT_DIGITS)
         {
-            const int NEG_EXPONENT_LIMIT = -5;
+            // Smallest value the framework formatter writes without exponent (decimal exponent -4).
+            const double MIN_NON_EXPONENT_DOUBLE = 1e-4;
 
             failed = false;
             long bits = BitConverter.DoubleToInt64Bits(value);
@@ -3330,7 +3331,11 @@ public sealed partial class JsonSerializer
             numFractionalDigits = Math.Max(0, MAX_SIGNIFICANT_DIGITS - numIntegralDigits + numLeadingFractionalZeros);
             printExponent = false;
 
-            if (exponent < NEG_EXPONENT_LIMIT || exponent > POS_EXPONENT_LIMIT)
+            // The negative switch is decided on the value itself, because the estimated exponent
+            // above is only approximate (0.34 instead of log10(2)) and e.g. yields -5 for 1e-5,
+            // which printed "0.00001" instead of "1E-05" like the framework formatter does.
+            // The exponent branch below normalizes the exponent anyway.
+            if (value < MIN_NON_EXPONENT_DOUBLE || exponent > POS_EXPONENT_LIMIT)
             {
                 printExponent = true;
                 value = (value * Math.Pow(10, -exponent));

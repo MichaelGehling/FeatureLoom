@@ -82,15 +82,18 @@ public class JsonDeserializerDictionaryKeySettingsTests
         Assert.Equal(1, value[new Key(8)]);
     }
 
-#if !NETSTANDARD2_0
-    [Fact]
-    public void SpanKeyParserReceivesRawUtf8PropertyNameBytes()
+[Fact]
+public void SpanKeyParserReceivesRawUtf8PropertyNameBytes()
     {
         int receivedLength = 0;
         var deserializer = CreateDeserializer(s => s.ConfigureType<Dictionary<Key, int>>(ts =>
             ts.ConfigureObjectKey<Key>(fragment =>
             {
+#if CORE_NETSTANDARD2_0
+                var bytes = fragment.Bytes.ToArray();
+#else
                 var bytes = fragment.Span;
+#endif
                 receivedLength = bytes.Length;
                 return new Key(bytes[0]);
             })));
@@ -99,7 +102,6 @@ public class JsonDeserializerDictionaryKeySettingsTests
         Assert.Equal(3, receivedLength);
         Assert.Equal(1, value[new Key((byte)'a')]);
     }
-#endif
 
     [Fact]
     public void PairArrayKeysContinueThroughNormalKeyReader()

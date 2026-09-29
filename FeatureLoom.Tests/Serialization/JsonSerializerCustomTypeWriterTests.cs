@@ -523,6 +523,7 @@ namespace FeatureLoom.Serialization
             Assert.Equal("\"EUR\"", serializer.Serialize(new Money { Amount = 12, Currency = "EUR" }));
         }
 
+        #if !CORE_NETSTANDARD2_0
         [Fact]
         public void CustomWriter_WritesStringFromCharSpanSlice()
         {
@@ -534,13 +535,18 @@ namespace FeatureLoom.Serialization
 
             Assert.Equal("\"EUR\"", serializer.Serialize(new Money { Amount = 12, Currency = "EUR" }));
         }
+#endif
 
         [Fact]
         public void CustomWriter_EscapesStringFromSpan()
         {
             var settings = new JsonSerializer.Settings();
             settings.ConfigureType<Money>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareValueWriter<Money>((value, item) =>
+#if CORE_NETSTANDARD2_0
+                value.WriteString("a\"b\\c"))));
+#else
                 value.WriteString("a\"b\\c".AsSpan()))));
+#endif
 
             var serializer = new JsonSerializer(settings);
 
@@ -571,7 +577,11 @@ namespace FeatureLoom.Serialization
             settings.ConfigureType<Money>(ts => ts.SetCustomTypeWriter(prep => prep.PrepareRawWriter<Money>((raw, item) =>
             {
                 raw.OpenArray();
-                raw.WriteRawJson("[1,2,3]".AsSpan(1, 5));
+                #if CORE_NETSTANDARD2_0
+                                raw.WriteRawJson(new TextSegment("[1,2,3]", 1, 5));
+                #else
+                                raw.WriteRawJson("[1,2,3]".AsSpan(1, 5));
+                #endif
                 raw.WriteComma();
                 raw.WriteRawJson(new TextSegment("xx42xx", 2, 2));
                 raw.CloseArray();
@@ -617,7 +627,11 @@ namespace FeatureLoom.Serialization
                     raw.WritePrepared(asSegment);
                     raw.WriteInt(item.Amount);
                     raw.WriteComma();
-                    raw.WritePrepared(new ReadOnlySpan<byte>(amountName));
+                    #if CORE_NETSTANDARD2_0
+                                        raw.WritePrepared(amountName);
+                    #else
+                                        raw.WritePrepared(new ReadOnlySpan<byte>(amountName));
+                    #endif
                     raw.WriteInt(item.Amount);
                     raw.CloseObject();
                 });

@@ -462,6 +462,7 @@ namespace FeatureLoom.Serialization
             Assert.Equal("{\"b\":20}", Serialize(dict, settings));
         }
 
+        #if !CORE_NETSTANDARD2_0
         [Theory]
         [MemberData(nameof(NoRefAndRefSettings))]
         public void ConfigureKey_WithSpanFormatter_WritesDictionaryAsObject(JsonSerializer.Settings settings)
@@ -473,6 +474,7 @@ namespace FeatureLoom.Serialization
             var dict = new Dictionary<ComplexKey, int> { [new ComplexKey { Id = 3, Name = "c" }] = 30 };
             Assert.Equal("{\"c\":30}", Serialize(dict, settings));
         }
+#endif
 
         /// <summary>
         /// The pair-array shape can be selected explicitly even for keys that could become

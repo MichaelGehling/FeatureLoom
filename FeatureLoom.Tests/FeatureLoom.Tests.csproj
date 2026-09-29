@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <StartupObject>FeatureLoom.DependencyInversion.ServiceRegistryTestProcess</StartupObject>
 
@@ -27,8 +27,40 @@
     </PackageReference>
   </ItemGroup>
 
+  <!--
+    Each test TFM exercises a different build of FeatureLoom.Core, so all variants show up side by side in Test Explorer:
+      net10.0 -> Core net8.0
+      net9.0  -> Core netstandard2.1
+      net8.0  -> Core netstandard2.0
+    The test TFM is only the host runtime; the Core TFM is forced via SetTargetFramework.
+    Override for a single run: dotnet test -f net10.0 -p:CoreTargetFramework=netstandard2.0
+    Transitive references are disabled so the nearest-match rule cannot silently pick another Core build.
+  -->
+  <PropertyGroup Condition="'$(CoreTargetFramework)' == ''">
+    <CoreTargetFramework Condition="'$(TargetFramework)' == 'net10.0'">net8.0</CoreTargetFramework>
+    <CoreTargetFramework Condition="'$(TargetFramework)' == 'net9.0'">netstandard2.1</CoreTargetFramework>
+    <CoreTargetFramework Condition="'$(TargetFramework)' == 'net8.0'">netstandard2.0</CoreTargetFramework>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(CoreTargetFramework)' != ''">
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+    <DependentTargetFramework Condition="'$(CoreTargetFramework)' == 'net8.0'">netstandard2.1</DependentTargetFramework>
+    <DependentTargetFramework Condition="'$(DependentTargetFramework)' == ''">$(CoreTargetFramework)</DependentTargetFramework>
+    <!-- e.g. CORE_NETSTANDARD2_0, usable in tests via #if to skip APIs not available in that Core build -->
+    <DefineConstants>$(DefineConstants);CORE_$(CoreTargetFramework.ToUpperInvariant().Replace('.', '_'))</DefineConstants>
+  </PropertyGroup>
+
+  <!-- References are unconditional so the outer (multi-target) evaluation used by VS also sees them; only the forced TFM is conditional. -->
   <ItemGroup>
-    <ProjectReference Include="..\FeatureLoom\FeatureLoom.csproj" />
+    <ProjectReference Include="..\FeatureLoom.Core\FeatureLoom.Core.csproj">
+      <SetTargetFramework Condition="'$(CoreTargetFramework)' != ''">TargetFramework=$(CoreTargetFramework)</SetTargetFramework>
+    </ProjectReference>
+    <ProjectReference Include="..\FeatureLoom\FeatureLoom.csproj">
+      <SetTargetFramework Condition="'$(DependentTargetFramework)' != ''">TargetFramework=$(DependentTargetFramework)</SetTargetFramework>
+    </ProjectReference>
+    <ProjectReference Include="..\FeatureLoom.Web\FeatureLoom.Web.csproj">
+      <SetTargetFramework Condition="'$(DependentTargetFramework)' != ''">TargetFramework=$(DependentTargetFramework)</SetTargetFramework>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

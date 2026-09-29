@@ -98,7 +98,7 @@ namespace FeatureLoom.Collections
             Assert.Equal(0, CountValidEntries(cache));
         }
 
-#if !NETSTANDARD2_0
+#if !CORE_NETSTANDARD2_0
         [Fact]
         public void Intern_Span_ReturnsCachedInstance_WithoutAllocatingOnHit()
         {

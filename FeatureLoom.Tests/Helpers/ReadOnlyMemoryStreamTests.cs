@@ -1,3 +1,4 @@
+#if !CORE_NETSTANDARD2_0
 using FeatureLoom.Helpers;
 using System;
 using System.IO;
@@ -69,3 +70,4 @@ namespace FeatureLoom.Helpers
         }
     }
 }
+#endif
