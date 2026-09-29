@@ -129,6 +129,44 @@ namespace FeatureLoom.Serialization
             public TypeNameFormat? genericTypeNameFormat = null;
 
             /// <summary>
+            /// Determines whether type-own configuration methods (marked with
+            /// <see cref="JsonTypeConfigurationAttribute"/>) are applied. Settings entries always
+            /// override type-own configuration. Default is <see cref="TypeSelfConfigurationMode.IgnoreButWarn"/>.
+            /// </summary>
+            public TypeSelfConfigurationMode typeSelfConfigurationMode = TypeSelfConfigurationMode.IgnoreButWarn;
+
+            /// <summary>
+            /// Applies the type-own configuration of <typeparamref name="T"/> to these settings upfront,
+            /// independent of <see cref="typeSelfConfigurationMode"/>. An existing entry for
+            /// <typeparamref name="T"/> keeps priority per option.
+            /// </summary>
+            public void ApplyTypeSelfConfiguration<T>() => ApplyTypeSelfConfiguration(typeof(T));
+
+            /// <inheritdoc cref="ApplyTypeSelfConfiguration{T}"/>
+            public void ApplyTypeSelfConfiguration(Type type)
+            {
+                if (type == null) throw new ArgumentNullException(nameof(type));
+                var selfSettings = CreateSelfConfiguredTypeSettings(type, this);
+                if (selfSettings == null) return;
+                if (typeSettingsDict.TryGetValue(type, out var existing)) selfSettings = existing.MergeOnto(selfSettings, ignoreMergedFlag: true);
+                typeSettingsDict[type] = selfSettings;
+            }
+
+            /// <summary>
+            /// Invokes the type-own write configuration method of <paramref name="type"/> on a fresh
+            /// settings object, or returns <see langword="null"/> if the type has none.
+            /// </summary>
+            internal static BaseTypeWriteSettings CreateSelfConfiguredTypeSettings(Type type, Settings owner)
+            {
+                var method = TypeSelfConfigurationHelper.GetWriteMethod(type);
+                if (method == null) return null;
+                var typeSettings = (BaseTypeWriteSettings)Activator.CreateInstance(typeof(TypeWriteSettings<>).MakeGenericType(type));
+                typeSettings.ownerSettings = owner;
+                method.Invoke(null, new object[] { typeSettings });
+                return typeSettings;
+            }
+
+            /// <summary>
             /// Builds a new settings instance and applies a configuration callback.
             /// </summary>
             /// <param name="configure">Configuration action; may be <see langword="null"/>.</param>
@@ -398,9 +436,9 @@ namespace FeatureLoom.Serialization
             /// Returns a new object; neither input is modified.
             /// </para>
             /// </remarks>
-            internal BaseTypeWriteSettings MergeOnto(BaseTypeWriteSettings generalSettings)
+            internal BaseTypeWriteSettings MergeOnto(BaseTypeWriteSettings generalSettings, bool ignoreMergedFlag = false)
             {
-                if (generalSettings == null || isMerged) return this;
+                if (generalSettings == null || (isMerged && !ignoreMergedFlag)) return this;
 
                 var merged = new BaseTypeWriteSettings
                 {
@@ -1525,6 +1563,19 @@ namespace FeatureLoom.Serialization
             /// </summary>
             public readonly bool hasTypeSettings;
 
+            public readonly TypeSelfConfigurationMode typeSelfConfigurationMode;
+
+            /// <summary>
+            /// Per type result of the settings lookup combined with type-own configuration. Only used if
+            /// type-own configuration is enabled. The compiled settings belong to one serializer and are
+            /// only accessed under its lock, so a plain dictionary is sufficient.
+            /// </summary>
+            private readonly Dictionary<Type, BaseTypeWriteSettings> resolvedTypeSettingsCache = new();
+
+            private bool SelfConfigurationEnabled =>
+                typeSelfConfigurationMode == TypeSelfConfigurationMode.Enabled ||
+                typeSelfConfigurationMode == TypeSelfConfigurationMode.EnabledKeepRefTrackingOff;
+
             public CompiledSettings(Settings settings)
             {
                 typeInfoHandling = settings.typeInfoHandling;
@@ -1554,6 +1605,7 @@ namespace FeatureLoom.Serialization
                                (referenceCheck == ReferenceCheck.AlwaysReplaceByRef || referenceCheck == ReferenceCheck.OnLoopReplaceByRef);
                 writeByteArrayAsBase64String = settings.writeByteArrayAsBase64String;
 
+                typeSelfConfigurationMode = settings.typeSelfConfigurationMode;
                 typeSettingsDict = new Dictionary<Type, BaseTypeWriteSettings>(settings.typeSettingsDict);
                 // A constructed type is a more specific configuration scope, not a replacement for
                 // its generic definition. Pre-merge configured constructed entries once so all
@@ -1576,6 +1628,38 @@ namespace FeatureLoom.Serialization
             /// <param name="typeSettings">Resolved settings, or <see langword="null"/>.</param>
             /// <returns><see langword="true"/> if settings were found.</returns>
             public bool TryGetTypeSettings(Type type, out BaseTypeWriteSettings typeSettings)
+            {
+                if (typeSelfConfigurationMode == TypeSelfConfigurationMode.Ignore) return TryGetConfiguredTypeSettings(type, out typeSettings);
+
+                if (resolvedTypeSettingsCache.TryGetValue(type, out typeSettings)) return typeSettings != null;
+
+                TryGetConfiguredTypeSettings(type, out typeSettings);
+                if (SelfConfigurationEnabled)
+                {
+                    // Same lookup order as for settings entries: exact type, then underlying type of a nullable.
+                    Type selfConfiguredType = Nullable.GetUnderlyingType(type) ?? type;
+                    // No owner: a custom writer with a type predicate would only become active after this
+                    // type was used, so it is rejected here. Use Settings.ApplyTypeSelfConfiguration upfront for that.
+                    var selfSettings = Settings.CreateSelfConfiguredTypeSettings(selfConfiguredType, null);
+                    if (selfSettings != null)
+                    {
+                        // Settings entries override type-own configuration per option. The entry may already be
+                        // pre-merged with its generic definition; merging once more here is a per-type one-time
+                        // step like that pre-merge, so the merged flag must not block it.
+                        typeSettings = typeSettings != null ? typeSettings.MergeOnto(selfSettings, ignoreMergedFlag: true) : selfSettings;
+                    }
+                }
+                else if (TypeSelfConfigurationHelper.GetWriteMethod(Nullable.GetUnderlyingType(type) ?? type) != null)
+                {
+                    OptLog.WARNING()?.Build($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(type)} has a type-own JSON write configuration, but it is ignored. " +
+                                           $"Set {nameof(Settings.typeSelfConfigurationMode)} to {nameof(TypeSelfConfigurationMode.Enabled)} to apply it or to {nameof(TypeSelfConfigurationMode.Ignore)} to suppress this warning.");
+                }
+
+                resolvedTypeSettingsCache[type] = typeSettings;
+                return typeSettings != null;
+            }
+
+            private bool TryGetConfiguredTypeSettings(Type type, out BaseTypeWriteSettings typeSettings)
             {
                 typeSettings = null;
                 if (!hasTypeSettings) return false;
@@ -1672,6 +1756,17 @@ namespace FeatureLoom.Serialization
             public bool TryGetCustomTypeName(Type type, out string customTypeName)
             {
                 customTypeName = null;
+                if (SelfConfigurationEnabled)
+                {
+                    // Exact settings entry first, then the type-own configuration, which always belongs to
+                    // exactly this type. The generic definition fallback of TryGetTypeSettings must not be used.
+                    if (hasTypeSettings && typeSettingsDict.TryGetValue(type, out var exact)) customTypeName = exact.customTypeName;
+                    if (customTypeName == null && Nullable.GetUnderlyingType(type) == null)
+                    {
+                        customTypeName = Settings.CreateSelfConfiguredTypeSettings(type, null)?.customTypeName;
+                    }
+                    return customTypeName != null;
+                }
                 if (!hasTypeSettings) return false;
 
                 if (typeSettingsDict.TryGetValue(type, out var typeSettings)) customTypeName = typeSettings.customTypeName;

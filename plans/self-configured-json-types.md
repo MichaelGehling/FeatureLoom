@@ -1,76 +1,67 @@
 # Self-configured JSON types
 
-## Goal
-Let a type configure its own JSON (de)serialization through an annotated (possibly private) static method.
-Settings-based configuration takes priority. You can turn self-configuration off globally.
+Status: **implemented** (serializer + deserializer). Open points listed at the end.
 
-## API sketch
+## Goal
+A type can configure its own JSON (de)serialization through a static method marked with an attribute. The method may be private.
+Settings-based configuration takes priority. Settings decide whether the type's own configuration is used.
+
+## API
 ```csharp
-[JsonTypeConfiguration] // new attribute in JsonAnnotations.cs
-static void ConfigureJsonWriting(JsonSerializer.Settings.TypeWriteSettings<MyType> s) { ... }
+[JsonTypeConfiguration]
+static void ConfigureWriting(JsonSerializer.TypeWriteSettings<MyType> s) { ... }
 
 [JsonTypeConfiguration]
-static void ConfigureJsonReading(JsonDeserializer.Settings.TypeSettings<MyType> s) { ... }
+static void ConfigureReading(JsonDeserializer.TypeSettings<MyType> s) { ... }
 ```
-- Signature: `static void M(TypeWriteSettings<T>)` / `static void M(TypeSettings<T>)`, where T is the declaring type.
-  (A parameter is simpler than `Action<Action<...>>`. If you prefer the `Action<...>`-returning form, it is a small change.)
-- The parameter type decides which side (writer/reader) a method belongs to. Allow at most one method per side, otherwise throw.
-- Generic types: the method is resolved on the closed type, so `TypeSettings<Foo<int>>` works naturally.
-- New settings flag on both Settings classes: `bool useTypeSelfConfiguration = true` (name to be decided).
+- Signature: `static void M(TypeWriteSettings<T>)` / `static void M(TypeSettings<T>)`, where T is the declaring type. The parameter type decides the side. At most one method per side; an invalid signature or a duplicate throws.
+- `TypeSelfConfigurationMode typeSelfConfigurationMode` exists on both `Settings` classes. Default: `IgnoreButWarn`.
+- `Settings.ApplyTypeSelfConfiguration<T>()` / `(Type)` exists on both sides. It copies the type's own configuration into `typeSettingsDict` upfront, whatever the mode. Existing entries still win.
+- Only takes effect when enabled via the mode or `ApplyTypeSelfConfiguration`. This is documented on the attribute.
 
-## Merge semantics
-`effective = settingsConfigured.MergeOnto(selfConfigured)`, so values from settings win. Precedence, from highest to lowest:
-1. Local/member override (existing)
-2. Settings exact type
-3. Settings generic definition
-4. Self-configuration of the type
-5. Recursive/ambient (existing)
+## Modes
+1. `Ignore`: never read, no reflection, no warning.
+2. `IgnoreButWarn` (default): not applied. Logs a warning once per type that has a method (one reflection check per type, cold path).
+3. `Enabled`: applied.
+   - Deserializer: reference resolution is not downgraded to ForceDisabled upfront. The string cache is always created.
+4. `EnabledKeepRefTrackingOff`: like `Enabled`, but the upfront ref-tracking downgrade stays. Type-own enabling of reference resolution is then ignored.
 
-## Steps
-1. Add the attribute plus the `useTypeSelfConfiguration` flag to both Settings classes (with cloning/copying).
-2. Add a helper `TryGetSelfTypeSettings(Type)`: reflection (NonPublic|Public|Static, DeclaredOnly), invoke on a fresh settings instance, cache per type (null results cached too).
-3. Deserializer: add a central `TryGetConfiguredTypeSettings(Type, out BaseTypeSettings)` (exact -> generic -> merged onto self) and replace the direct `typeSettingsDict` lookups in `CreateCachedTypeReader`.
-4. Serializer: do the same in `CreateCachedTypeWriter`.
-5. Check the settings pre-processing in the `ExtensiveSettings` ctor (merge of generics / `allTypeSettings`): self settings must go through the same preparation (e.g. member name resolution) or be prepared lazily.
-6. Tests: self-config only, settings override a single property, settings unrelated property + self property both apply, flag off, private method, generic type, struct, invalid signature -> exception, round trip.
-7. Update `.github/skills/json-serialization.md`.
+## Semantics
+- Precedence, highest to lowest:
+  1. Local/member override
+  2. Settings exact type
+  3. Settings generic definition
+  4. The type's own configuration
+  5. Recursive/ambient settings
+- Merge: `settingsEntry.MergeOnto(selfConfig, ignoreMergedFlag: true)`, resolved once per type and cached in `CompiledSettings`.
+- No inheritance (`DeclaredOnly`), same as settings entries.
+- Generics: resolved on the closed type.
+- Nullable: `T?` uses the configuration of `T` on both sides.
+- Limitation: custom type names, proposed types and custom writers selected by type predicate are prepared upfront. When they are needed, use `ApplyTypeSelfConfiguration<T>()`.
 
-## Decisions
-- No inheritance: settings lookup is exact type -> generic definition only; self-config mirrors that (DeclaredOnly).
-- Method form: `static void M(TypeSettings<T>)` == method group convertible to `Action<TypeSettings<T>>`; bind via `Delegate.CreateDelegate` and feed into the same code path as `ConfigureType<T>(Action<...>)`.
-- Self-config behaves exactly like a settings entry (incl. recursive settings).
+## Implementation
+- `JsonAnnotations.cs`: `JsonTypeConfigurationAttribute`, `TypeSelfConfigurationMode`.
+- `TypeSelfConfigurationHelper.cs`: reflection discovery and validation, cached process-wide per type.
+- `JsonSerializer.Settings.cs`: mode, `ApplyTypeSelfConfiguration`, `CompiledSettings.TryGetTypeSettings` with self-config, warning and cache.
+- `JsonDeserializer.Settings.cs`: mode, `ApplyTypeSelfConfiguration`, `CompiledSettings.TryGetTypeSettings(type, out settings, out fromGenericDefinition)`, and flag handling for reference resolution and the string cache.
+- `JsonDeserializer.TypeReaderCreation.cs`:
+  - `CreateCachedTypeReader` uses the central lookup.
+  - `CreateNullableStructReader<T>` (prerequisite fix: `Nullable<customStruct>` could not be read at all before).
 
-## Verified lookup behavior (must be mirrored)
-- Serializer `ExtensiveSettings.TryGetTypeSettings`: exact -> Nullable underlying -> generic definition. Constructed entries pre-merged onto generic definition. No base class / interface lookup.
-- Deserializer `CreateCachedTypeReader`: exact -> generic definition (pre-merged in ctor). No Nullable fallback, no base class / interface lookup.
-- Deviation between both sides (Nullable) is pre-existing; self-config follows each side's lookup. Fixing the Nullable asymmetry is out of scope unless requested.
-- Self-config merge: `settingsEntry.MergeOnto(selfConfig)`; for constructed generic types: exact settings > generic-definition settings > self-config of closed type.
+## Tests (all passing)
+- `JsonSerializerTypeSelfConfigurationTests` (12)
+- `JsonDeserializerTypeSelfConfigurationTests` (9)
+- `JsonDeserializerNullableTypeSettingsTests` (4)
+- Full suite: 2487 tests, 2482 passed, 0 failed.
 
-## Risk: deserializer global flags
-
-### Step 0 (first, separate change): Nullable fallback in deserializer — DONE
-Finding: deserializer could not read `Nullable<customStruct>` at all (even without settings). Fixed via `CreateNullableStructReader<T>` delegating to the underlying type's reader, so settings of T apply to T?. Tests: `JsonDeserializerNullableTypeSettingsTests` (4 passing).
-Original idea: add a central `CompiledSettings.TryGetTypeSettings(Type, out BaseTypeSettings)` mirroring the serializer (exact -> Nullable underlying -> generic definition), use it in `CreateCachedTypeReader`, add tests (ConfigureType<MyStruct> applies to MyStruct? members/values).
-
-### Generics
-Self-config is resolved on the closed runtime type; no separate generic-definition mechanism needed.
-
-### Flag analysis (B = late update)
-- `referenceResolutionMode` DisabledByDefault -> ForceDisabled (ctor) and `refResolutionEnabled`: readers built before discovery already skip ref-path tracking; flipping later gives inconsistent reader graph -> unsafe. Proposal: when self-config is on, do not downgrade to ForceDisabled (per-type check stays; perf impact to be measured).
-- `anyUsesStringCache`: late lazy creation of `stringCache` is safe (null-checked usage). Proposal: create lazily on discovery.
-- `anyAllowsProposedTypes` / custom type names: self-configured custom type names are only known after the type was touched; cannot be proposed before. Proposal: register on discovery, document limitation.
-
-### Decision: 3-way mode (replaces bool flag)
-`TypeSelfConfigurationMode` on both Settings classes (names tentative):
-1. `Ignore` - self-config never read.
-2. `Enabled` - self-config applied; ref-tracking not downgraded to ForceDisabled upfront. XML doc: performance cost when no type needs refs.
-3. `EnabledKeepRefTrackingOff` - self-config applied, but if the upfront scan forced ref resolution off, a self-config `enableReferenceResolution` is ignored. XML doc: inconsistent behavior.
-- String cache: created lazily on discovery (verify null-safety).
-- Proposed types / custom type names: XML doc limitation; solution = new `Settings.ApplyTypeSelfConfiguration<T>()` / `(Type)` that copies self-config into `typeSettingsDict` upfront (existing settings entries still win).
-- Serializer: check for a similar upfront downgrade; otherwise modes 2/3 behave identically there.
-- Default mode: `IgnoreButWarn`. Final 4-way enum:
-  1. `Ignore` - never read, no reflection, no warning (for intentionally ignoring type-own config).
-  2. `IgnoreButWarn` (default) - not applied; on first reader/writer creation per type, detect an annotated method and log a warning once. Cost (one reflection check per type, cold path) to be measured.
-  3. `Enabled` - applied; no upfront ref-tracking downgrade (perf cost documented).
-  4. `EnabledKeepRefTrackingOff` - applied; upfront ref-tracking downgrade kept, self-config ref enabling ignored (inconsistency documented).
-Deserializer `ExtensiveSettings` ctor precomputes `anyTypeHasReferenceResolutionEnabled`, `anyUsesStringCache`, `anyAllowsProposedTypes` from all type settings. Lazily discovered self-config would not affect these. Options: (a) update flags when self-config is resolved (only safe before first read uses them), (b) conservatively treat those flags as enabled when self-config is on, (c) scan on first discovery and rebuild. Decision needed.
+## Open points
+- [x] Benchmark `TypeSelfConfigurationModeTest` (.NET 10, in-process, single run). Results (Ignore / IgnoreButWarn / Enabled / EnabledKeepRefTrackingOff):
+  - Steady_Serialize: 223.6 / 228.7 / 240.9 / 244.4 us
+  - Steady_Deserialize: 533.4 / 536.2 / 551.9 / 540.8 us
+  - Cold_Serialize: 7320 / 7319 / 7218 / 7320 us
+  - Cold_Deserialize: 1936 / 1878 / 1887 / 1866 us
+  - Default mode: no relevant cost. Enabled modes: ~+8% steady serialize. Not expected; investigate whether `TryGetTypeSettings` is hit per value on the serializer hot path.
+`EnabledKeepRefTrackingOff` was the fastest mode this time, while in the two earlier runs both enabled modes were the slowest. Ignore's StdDev (27.8 us) shows this run was disturbed. Conclusion: most likely noise, no mode-dependent cost; not proven, since the writer comparison test was not written.
+- [x] Update `.github/skills/json-serialization.md` with the feature.
+- [x] Benchmarks closed: no further benchmarking for this topic (decided by user).
+logged exactly once per type (serializer and deserializer, via

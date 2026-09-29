@@ -44,5 +44,11 @@ applyTo: "**/Serialization/**"
 - Runtime polymorphy: a value whose runtime type deviates is written by the runtime type's writer. `GetTransferableSubset()` decides what follows it — policy fields and `memberSettingsDict` do, `customTypeName` and `customTypeWriterCreator` do not.
 - `CachedTypeWriter.NoRefTypes` describes the **declared** type only. Use `NoRefTypesIncludingRuntimeTypes` when the declared type can deviate at runtime, otherwise ref-path bookkeeping can be skipped unsoundly.
 
+## Type self-configuration
+- A type can own its configuration through a static method marked `[JsonTypeConfiguration]` taking `JsonSerializer.TypeWriteSettings<T>` or `JsonDeserializer.TypeSettings<T>` (T = declaring type). Discovery/validation lives in `TypeSelfConfigurationHelper` (cached per type, `DeclaredOnly`, no inheritance).
+- Only effective if `typeSelfConfigurationMode` is `Enabled`/`EnabledKeepRefTrackingOff`, or via `Settings.ApplyTypeSelfConfiguration<T>()`. Default `IgnoreButWarn` logs once per type; `Ignore` does no reflection.
+- Resolution happens only in `CompiledSettings.TryGetTypeSettings` (both sides): settings entry (exact, then generic definition) is merged onto the type-own config with `ignoreMergedFlag: true`, cached per type. Keep all type-settings lookups going through it.
+- Anything prepared upfront (custom type names, proposed types, predicate-selected custom writers, deserializer ref-resolution/string-cache flags) cannot see lazily discovered config. Deserializer `Enabled` therefore skips the ref-resolution ForceDisabled downgrade and always creates the string cache.
+
 ## Definition of done
 Any parsing/formatting change needs a regression test in `FeatureLoom.Tests/Serialization/` (see the testing instructions), and a benchmark run if it was performance motivated.

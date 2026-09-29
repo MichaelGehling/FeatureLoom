@@ -1913,6 +1913,84 @@ namespace FeatureLoom.Serialization
             Assert.Same(first.Child.Text, second.Child.Text);
         }
 
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Settings_ElementSetUseStringCache_OverridesGlobal_ForStringCollections(bool global)
+        {
+            var settings = new JsonDeserializer.Settings { useStringCache = global };
+            settings.ConfigureType<string[]>(ts => ts.ConfigureElement<string>(es => es.SetUseStringCache(!global)));
+            settings.ConfigureType<List<string>>(ts => ts.ConfigureElement<string>(es => es.SetUseStringCache(!global)));
+            settings.ConfigureType<HashSet<string>>(ts => ts.ConfigureElement<string>(es => es.SetUseStringCache(!global)));
+            var deserializer = new JsonDeserializer(settings);
+            const string json = "[\"value-1234567890-abcdef\",\"value-1234567890-abcdef\"]";
+
+            Assert.True(deserializer.TryDeserialize(json, out string[] array));
+            Assert.Equal(!global, ReferenceEquals(array[0], array[1]));
+            Assert.True(deserializer.TryDeserialize(json, out List<string> list));
+            Assert.Equal(!global, ReferenceEquals(list[0], list[1]));
+            Assert.True(deserializer.TryDeserialize("[\"value-1234567890-abcdef\"]", out HashSet<string> set1));
+            Assert.True(deserializer.TryDeserialize("[\"value-1234567890-abcdef\"]", out HashSet<string> set2));
+            Assert.Equal(!global, ReferenceEquals(set1.First(), set2.First()));
+        }
+
+        [Fact]
+        public void Settings_ElementSetUseStringCache_WorksForDictionaryValues()
+        {
+            var settings = new JsonDeserializer.Settings { useStringCache = false };
+            settings.ConfigureType<Dictionary<string, string>>(ts => ts.ConfigureElement<string>(es => es.SetUseStringCache(true)));
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("{\"a\":\"value-1234567890-abcdef\",\"b\":\"value-1234567890-abcdef\"}", out Dictionary<string, string> dict));
+            Assert.Same(dict["a"], dict["b"]);
+        }
+
+        [Fact]
+        public void Settings_TypeSetUseStringCache_AppliesToDirectStringMembers_MemberOverrideWins()
+        {
+            var settings = new JsonDeserializer.Settings { useStringCache = false };
+            settings.ConfigureType<StringCacheMemberSample>(ts =>
+            {
+                ts.SetUseStringCache(true);
+                ts.ConfigureMember<string>(nameof(StringCacheMemberSample.NonCached), ms => ms.SetUseStringCache(false));
+            });
+            var deserializer = new JsonDeserializer(settings);
+            const string json = "{\"CachedByGlobal\":\"value-1234567890-abcdef\",\"NonCached\":\"value-1234567890-abcdef\"}";
+
+            Assert.True(deserializer.TryDeserialize(json, out StringCacheMemberSample first));
+            Assert.True(deserializer.TryDeserialize(json, out StringCacheMemberSample second));
+            Assert.Same(first.CachedByGlobal, second.CachedByGlobal);
+            Assert.NotSame(first.NonCached, second.NonCached);
+        }
+
+        [Fact]
+        public void Settings_TypeSetUseStringCache_AppliesToDirectStringCollection()
+        {
+            var settings = new JsonDeserializer.Settings { useStringCache = false };
+            settings.ConfigureType<List<string>>(ts => ts.SetUseStringCache(true));
+            var deserializer = new JsonDeserializer(settings);
+
+            Assert.True(deserializer.TryDeserialize("[\"value-1234567890-abcdef\",\"value-1234567890-abcdef\"]", out List<string> list));
+            Assert.Same(list[0], list[1]);
+        }
+
+        [Fact]
+        public void Settings_TypeSetUseStringCache_WinsOverRecursive()
+        {
+            var settings = new JsonDeserializer.Settings { useStringCache = false };
+            settings.ConfigureType<StringCacheMemberSample>(ts =>
+            {
+                ts.ConfigureRecursively(rs => rs.SetUseStringCache(false));
+                ts.SetUseStringCache(true);
+            });
+            var deserializer = new JsonDeserializer(settings);
+            const string json = "{\"CachedByGlobal\":\"value-1234567890-abcdef\"}";
+
+            Assert.True(deserializer.TryDeserialize(json, out StringCacheMemberSample first));
+            Assert.True(deserializer.TryDeserialize(json, out StringCacheMemberSample second));
+            Assert.Same(first.CachedByGlobal, second.CachedByGlobal);
+        }
+
         private class StringCacheMemberSample
         {
             public string CachedByGlobal;

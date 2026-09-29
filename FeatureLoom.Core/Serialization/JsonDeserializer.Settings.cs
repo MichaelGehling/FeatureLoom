@@ -1,6 +1,7 @@
 ﻿using FeatureLoom.Collections;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
+using FeatureLoom.Logging;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -136,7 +137,50 @@ public sealed partial class JsonDeserializer
         public bool useStringCache = true;
 
         /// <summary>
-        /// Bit size of the string cache (entry count is 2^N).
+        /// Determines whether type-own configuration methods (marked with
+        /// <see cref="JsonTypeConfigurationAttribute"/>) are applied. Settings entries always
+        /// override type-own configuration. Default is <see cref="TypeSelfConfigurationMode.IgnoreButWarn"/>.
+        /// </summary>
+        /// <remarks>
+        /// With <see cref="TypeSelfConfigurationMode.Enabled"/> reference resolution and the string cache stay
+        /// available, because type-own configuration is only discovered when a type is first read.
+        /// <see cref="TypeSelfConfigurationMode.EnabledKeepRefTrackingOff"/> keeps reference resolution disabled
+        /// unless a settings entry enables it.
+        /// </remarks>
+        public TypeSelfConfigurationMode typeSelfConfigurationMode = TypeSelfConfigurationMode.IgnoreButWarn;
+
+        /// <summary>
+        /// Applies the type-own configuration of <typeparamref name="T"/> to these settings upfront,
+        /// independent of <see cref="typeSelfConfigurationMode"/>. An existing entry for
+        /// <typeparamref name="T"/> keeps priority per option.
+        /// </summary>
+        public void ApplyTypeSelfConfiguration<T>() => ApplyTypeSelfConfiguration(typeof(T));
+
+        /// <inheritdoc cref="ApplyTypeSelfConfiguration{T}"/>
+        public void ApplyTypeSelfConfiguration(Type type)
+        {
+            if (type == null) throw new ArgumentNullException(nameof(type));
+            var selfSettings = CreateSelfConfiguredTypeSettings(type);
+            if (selfSettings == null) return;
+            if (typeSettingsDict.TryGetValue(type, out var existing)) selfSettings = existing.MergeOnto(selfSettings, ignoreMergedFlag: true);
+            typeSettingsDict[type] = selfSettings;
+        }
+
+        /// <summary>
+        /// Invokes the type-own read configuration method of <paramref name="type"/> on a fresh
+        /// settings object, or returns <see langword="null"/> if the type has none.
+        /// </summary>
+        internal static BaseTypeSettings CreateSelfConfiguredTypeSettings(Type type)
+        {
+            var method = TypeSelfConfigurationHelper.GetReadMethod(type);
+            if (method == null) return null;
+            var typeSettings = (BaseTypeSettings)Activator.CreateInstance(typeof(TypeSettings<>).MakeGenericType(type));
+            method.Invoke(null, new object[] { typeSettings });
+            return typeSettings;
+        }
+
+        /// <summary>
+        /// Bit size
         /// </summary>
         /// <example>
         /// Value 12 results in 4096 cache slots.
@@ -673,7 +717,10 @@ public sealed partial class JsonDeserializer
         /// <summary>Member-level alternate name override.</summary>
         internal string member_overrideName = null;
 
-        /// <summary>Member-level string-cache usage override.</summary>
+        /// <summary>
+        /// String-cache usage override. On a string member/element it applies to that value; on any
+        /// other type scope it applies to the string members/elements read directly by that type.
+        /// </summary>
         internal bool? member_useStringCache = null;
 
         /// <summary>Type/member-level data-access override.</summary>
@@ -758,7 +805,16 @@ public sealed partial class JsonDeserializer
         public void SetUnknownFieldPolicy(UnknownFieldPolicy policy) => unknownFieldPolicy = policy;
 
         /// <summary>
-        /// Configures read policies inherited by this type scope and its complete value subtree.
+        /// Enables or disables string-cache usage for this scope, overriding the global setting.
+        /// </summary>
+        /// <remarks>
+        /// For a string member or string element it applies to that value. For any other type scope
+        /// (type, generic definition, complex member/element) it applies to the string members and
+        /// string elements read directly by that type, but not to nested types.
+        /// Use <see cref="ConfigureRecursively"/> to apply it to a whole subtree.
+        /// </remarks>
+        /// <param name="useStringCache"><see langword="true"/> to use string caching for this scope.</param>
+        public void SetUseStringCache(bool useStringCache) => member_useStringCache = useStringCache;
         /// </summary>
         public void ConfigureRecursively(Action<RecursiveReadSettings> configure)
         {
@@ -771,9 +827,9 @@ public sealed partial class JsonDeserializer
             configure(recursiveSettings);
         }
 
-        internal BaseTypeSettings MergeOnto(BaseTypeSettings broaderSettings)
+        internal BaseTypeSettings MergeOnto(BaseTypeSettings broaderSettings, bool ignoreMergedFlag = false)
         {
-            if (broaderSettings == null || isMerged) return this;
+            if (broaderSettings == null || (isMerged && !ignoreMergedFlag)) return this;
 
             var merged = new BaseTypeSettings
             {
@@ -1539,15 +1595,6 @@ public sealed partial class JsonDeserializer
         /// </summary>
         /// <param name="alternateName">Alternate name used in payload matching.</param>
         public void OverrideName(string alternateName) => this.member_overrideName = alternateName;
-
-        /// <summary>
-        /// Enables or disables string-cache usage for this specific member.
-        /// </summary>
-        /// <param name="useStringCache"><see langword="true"/> to use string caching for this member.</param>
-        public void SetUseStringCache(bool useStringCache)
-        {
-            this.member_useStringCache = useStringCache;
-        }
     }
 
     /// <summary>
@@ -1631,6 +1678,58 @@ public sealed partial class JsonDeserializer
         /// <summary>Deep-cloned type-settings map.</summary>
         public readonly Dictionary<Type, BaseTypeSettings> typeSettingsDict;
 
+        /// <summary>Resolved type self-configuration mode.</summary>
+        public readonly TypeSelfConfigurationMode typeSelfConfigurationMode;
+
+        /// <summary>
+        /// Per type result of the settings lookup combined with type-own configuration. The compiled
+        /// settings belong to one deserializer and are only accessed under its lock.
+        /// </summary>
+        private readonly Dictionary<Type, BaseTypeSettings> resolvedTypeSettingsCache = new();
+
+        /// <summary>
+        /// Looks up the settings for <paramref name="type"/> (exact type, then generic definition) and,
+        /// depending on <see cref="typeSelfConfigurationMode"/>, layers them over the type-own configuration.
+        /// </summary>
+        internal bool TryGetTypeSettings(Type type, out BaseTypeSettings typeSettings, out bool fromGenericDefinition)
+        {
+            fromGenericDefinition = false;
+            if (!typeSettingsDict.TryGetValue(type, out typeSettings) && type.IsGenericType &&
+                typeSettingsDict.TryGetValue(type.GetGenericTypeDefinition(), out typeSettings))
+            {
+                fromGenericDefinition = true;
+            }
+            if (typeSelfConfigurationMode == TypeSelfConfigurationMode.Ignore) return typeSettings != null;
+
+            if (resolvedTypeSettingsCache.TryGetValue(type, out var resolved))
+            {
+                if (resolved != typeSettings) fromGenericDefinition = false;
+                typeSettings = resolved;
+                return typeSettings != null;
+            }
+
+            if (typeSelfConfigurationMode == TypeSelfConfigurationMode.IgnoreButWarn)
+            {
+                if (TypeSelfConfigurationHelper.GetReadMethod(type) != null)
+                {
+                    OptLog.WARNING()?.Build($"Type {TypeNameHelper.Shared.GetSimplifiedTypeName(type)} has a type-own JSON read configuration, but it is ignored. " +
+                                           $"Set {nameof(Settings.typeSelfConfigurationMode)} to {nameof(TypeSelfConfigurationMode.Enabled)} to apply it or to {nameof(TypeSelfConfigurationMode.Ignore)} to suppress this warning.");
+                }
+            }
+            else
+            {
+                var selfSettings = Settings.CreateSelfConfiguredTypeSettings(type);
+                if (selfSettings != null)
+                {
+                    // Settings entries override type-own configuration per option.
+                    typeSettings = typeSettings != null ? typeSettings.MergeOnto(selfSettings, ignoreMergedFlag: true) : selfSettings;
+                    fromGenericDefinition = false;
+                }
+            }
+            resolvedTypeSettingsCache[type] = typeSettings;
+            return typeSettings != null;
+        }
+
         /// <summary>
         /// Compiles a mutable <see cref="Settings"/> instance into an immutable runtime snapshot.
         /// </summary>
@@ -1661,6 +1760,7 @@ public sealed partial class JsonDeserializer
             allowUninitializedObjectCreation = settings.allowUninitializedObjectCreation;
 
             typeWhitelistMode = settings.typeWhitelistMode;
+            typeSelfConfigurationMode = settings.typeSelfConfigurationMode;
             allowedTypes = new(settings.allowedTypes);
             allowedNamespacePrefixes = new(settings.allowedNamespacePrefixes, StringComparer.Ordinal);
 
@@ -1687,7 +1787,7 @@ public sealed partial class JsonDeserializer
             {
                 var typeSettings = allTypeSettings[i];
                 if (typeSettings.enableReferenceResolution == true) anyTypeHasReferenceResolutionEnabled = true;
-                if (typeSettings.member_useStringCache == true) anyUsesStringCache = true;
+                if (typeSettings.member_useStringCache == true || typeSettings.recursiveSettings?.useStringCache == true) anyUsesStringCache = true;
                 if (typeSettings.applyProposedTypes == true) anyAllowsProposedTypes = true;
                 if (anyTypeHasReferenceResolutionEnabled && anyUsesStringCache && anyAllowsProposedTypes) break;
 
@@ -1695,10 +1795,17 @@ public sealed partial class JsonDeserializer
                 {
                     allTypeSettings.AddRange(typeSettings.memberSettingsDict.Values);
                 }
+                if (typeSettings.elementSettings != null) allTypeSettings.Add(typeSettings.elementSettings);
             }
-            if (!anyTypeHasReferenceResolutionEnabled && referenceResolutionMode == ReferenceResolutionMode.DisabledByDefault)
+            if (!anyTypeHasReferenceResolutionEnabled && referenceResolutionMode == ReferenceResolutionMode.DisabledByDefault &&
+                typeSelfConfigurationMode != TypeSelfConfigurationMode.Enabled)
             {
                 referenceResolutionMode = ReferenceResolutionMode.ForceDisabled;
+            }
+            // Type-own configuration is discovered lazily, so the string cache must be available if it could request it.
+            if (typeSelfConfigurationMode == TypeSelfConfigurationMode.Enabled || typeSelfConfigurationMode == TypeSelfConfigurationMode.EnabledKeepRefTrackingOff)
+            {
+                anyUsesStringCache = true;
             }
         }
     }

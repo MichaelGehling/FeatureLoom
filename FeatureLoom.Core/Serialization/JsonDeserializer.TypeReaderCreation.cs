@@ -76,38 +76,16 @@ public sealed partial class JsonDeserializer
         bool overriddenTypeSettings = typeSettings != null;
         BaseTypeSettings localSettings = typeSettings;
         bool genericTypeSettings = false;
+        // Exact type, then generic definition; combined with type-own configuration depending on the mode.
+        settings.TryGetTypeSettings(itemType, out BaseTypeSettings generalSettings, out bool fromGenericDefinition);
         if (overriddenTypeSettings)
         {
-            if (settings.typeSettingsDict.TryGetValue(itemType, out BaseTypeSettings configuredSettings))
-            {
-                typeSettings = typeSettings.MergeOnto(configuredSettings);
-            }
-            else if (itemType.IsGenericType &&
-                     settings.typeSettingsDict.TryGetValue(itemType.GetGenericTypeDefinition(), out configuredSettings))
-            {
-                typeSettings = typeSettings.MergeOnto(configuredSettings);
-            }
+            if (generalSettings != null) typeSettings = typeSettings.MergeOnto(generalSettings);
         }
         else
         {
-            // if not overridden type settings are provided, we check if there are type settings for the given item type                        
-            if (!settings.typeSettingsDict.TryGetValue(itemType, out typeSettings))
-            {
-                // if there are no type settings for the given item type, we also check for generic type definitions,
-                // so we can have type settings for e.g. List<> that apply to all List<T> types.
-                if (itemType.IsGenericType)
-                {
-                    settings.typeSettingsDict.TryGetValue(itemType.GetGenericTypeDefinition(), out typeSettings);
-                    if (typeSettings != null) genericTypeSettings = true;
-                }
-            }
-        }
-
-        BaseTypeSettings generalSettings = null;
-        settings.typeSettingsDict.TryGetValue(itemType, out generalSettings);
-        if (generalSettings == null && itemType.IsGenericType)
-        {
-            settings.typeSettingsDict.TryGetValue(itemType.GetGenericTypeDefinition(), out generalSettings);
+            typeSettings = generalSettings;
+            genericTypeSettings = fromGenericDefinition;
         }
         bool hasExplicitTypeSettings = typeSettings != null;
         var recursiveSettings = LayerRecursiveSettings(ambientRecursiveSettings, generalSettings?.recursiveSettings);
@@ -186,7 +164,13 @@ public sealed partial class JsonDeserializer
             }
 
             if (itemType.IsArray) return CreateArrayTypeReader(itemType, cachedTypeReader);
-            else if (itemType == typeof(string)) return TypeReaderInitializer.Create(this, ReadStringValueOrNull, null, false, typeSettings);
+            else if (itemType == typeof(string))
+            {
+                // Scoped override (e.g. element settings); otherwise the global flag is checked at read time.
+                if (typeSettings?.member_useStringCache == null) return TypeReaderInitializer.Create(this, ReadStringValueOrNull, null, false, typeSettings);
+                if (typeSettings.member_useStringCache.Value) return TypeReaderInitializer.Create(this, ReadStringValueOrNull_WithStringCache, null, false, typeSettings);
+                return TypeReaderInitializer.Create(this, ReadStringValueOrNull_WithoutStringCache, null, false, typeSettings);
+            }
             else if (itemType == typeof(long)) return TypeReaderInitializer.Create(this, ReadLongValue, null, false, typeSettings);
             else if (itemType == typeof(long?)) return TypeReaderInitializer.Create(this, ReadNullableLongValue, null, false, typeSettings);
             else if (itemType == typeof(int)) return TypeReaderInitializer.Create(this, ReadIntValue, null, false, typeSettings);
@@ -1542,6 +1526,12 @@ public sealed partial class JsonDeserializer
                 }
             }
 
+            // Type-scope string-cache override applies to direct string members without their own override.
+            if (fieldType == typeof(string) && typeSettings?.member_useStringCache != null && memberSettings?.member_useStringCache == null)
+            {
+                memberSettings = new BaseTypeSettings { member_useStringCache = typeSettings.member_useStringCache }.MergeOnto(memberSettings);
+            }
+
             void AddReader(string fieldName)
             {
                 ByteSegment preparedName = new ByteSegment(fieldName.ToByteArray(), true);
@@ -1867,6 +1857,22 @@ public sealed partial class JsonDeserializer
         return memberSettings.member_useStringCache.Value;
     }
 
+    private bool CheckUseStringCache(BaseTypeSettings elementSettings, BaseTypeSettings containerSettings)
+    {
+        if (elementSettings?.member_useStringCache != null) return elementSettings.member_useStringCache.Value;
+        return CheckUseStringCache(containerSettings);
+    }
+
+    // Element settings that only override string caching still allow the specialized (no-check) collection readers.
+    private static bool IsOnlyStringCacheOverride(BaseTypeSettings s) =>
+        s.member_useStringCache != null &&
+        s.mappedType == null && s.multiOptionMappedTypes.Count == 0 &&
+        s.dataAccess == null && s.backingFieldMode == null && s.enableReferenceResolution == null &&
+        s.applyProposedTypes == null && s.populateAsMember == null && s.castObjectArrayToCommonTypeArray == null &&
+        s.allowUninitializedObjectCreation == null && s.unknownFieldPolicy == null &&
+        s.constructor == null && s.collectionConstructor == null && s.customTypeReader == null &&
+        s.memberSettingsDict.Count == 0 && s.elementSettings == null && s.recursiveSettings == null && s.keyParser == null;
+
     private Func<C, C> CreatePropertyWriterUsingExpression<T, V, C>(PropertyInfo propertyInfo, ByteSegment fieldName, BaseTypeSettings memberSettings) where T : C
     {
         Type itemType = typeof(T);
@@ -2077,11 +2083,12 @@ public sealed partial class JsonDeserializer
         var pool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 10, false);
 
         var elementTypeReader = GetCachedTypeReaderForElement(typeof(E), cachedTypeReader.TypeSettings);
-        if (GetElementSettings(typeof(E), cachedTypeReader.TypeSettings) == null && elementTypeReader.IsNoCheckPossible<E>())
+        var arrayElementSettings = GetElementSettings(typeof(E), cachedTypeReader.TypeSettings);
+        if ((arrayElementSettings == null || IsOnlyStringCacheOverride(arrayElementSettings)) && elementTypeReader.IsNoCheckPossible<E>())
         {
             if (typeof(E) == typeof(string))
             {
-                return CreateStringArrayTypeReader(CheckUseStringCache(cachedTypeReader.TypeSettings), cachedTypeReader);
+                return CreateStringArrayTypeReader(CheckUseStringCache(arrayElementSettings, cachedTypeReader.TypeSettings), cachedTypeReader);
             }
             if (typeof(E) == typeof(char)) return CreateGenericArrayTypeReaderViaStrategy<E, CharReaderStrategy, char>(elementTypeReader, pool, cachedTypeReader);
             if (typeof(E) == typeof(sbyte)) return CreateGenericArrayTypeReaderViaStrategy<E, SByteReaderStrategy, sbyte>(elementTypeReader, pool, cachedTypeReader);
@@ -2288,12 +2295,14 @@ public sealed partial class JsonDeserializer
         Func<IEnumerable<E>, T> constructor = GetConstructor<T, IEnumerable<E>>(typeSettings);        
         Pool<List<E>> bufferPool = new Pool<List<E>>(() => new List<E>(), l => l.Clear(), 10, false);
 
-        if (GetElementSettings(typeof(E), typeSettings) == null && elementTypeReader.IsNoCheckPossible<E>())
+        var enumerableElementSettings = GetElementSettings(typeof(E), typeSettings);
+        if ((enumerableElementSettings == null || IsOnlyStringCacheOverride(enumerableElementSettings)) && elementTypeReader.IsNoCheckPossible<E>())
         {
             if (typeof(E) == typeof(string))
             {
-                if (typeof(T) == typeof(List<string>) && typeSettings?.collectionConstructor == null) return CreateStringListTypeReader(CheckUseStringCache(typeSettings), cachedTypeReader);
-                if (CheckUseStringCache(typeSettings)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringCollectionReader_WithStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
+                bool useCache = CheckUseStringCache(enumerableElementSettings, typeSettings);
+                if (typeof(T) == typeof(List<string>) && typeSettings?.collectionConstructor == null) return CreateStringListTypeReader(useCache, cachedTypeReader);
+                if (useCache) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringCollectionReader_WithStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
                 else return CreateGenericEnumerableTypeReaderViaStrategy<T, E, StringCollectionReader_WithoutStringCache_Strategy, string>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
             }
             if (typeof(E) == typeof(char)) return CreateGenericEnumerableTypeReaderViaStrategy<T, E, CharReaderStrategy, char>(elementTypeReader, constructor, bufferPool, cachedTypeReader);
