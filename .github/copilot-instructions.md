@@ -28,6 +28,7 @@ Solution: `FeatureProjects.sln`.
 - Always add/update tests for new/changed behavior. The test suite must pass before a change is considered complete.
 - Add comments for non-obvious decisions. Trivial code does not need comments. Add XML comments for public APIs.
 - Propose to add/adapt a skill file for any new domain area. Skills are the primary way to communicate domain knowledge and conventions.
+- Never degrade performance/allocations of shared code to achieve .NET Framework 4.8 (netstandard2.0) compatibility, especially in hot paths; use conditional compilation blocks (#if NETSTANDARD2_0) for compatibility-specific code instead.
 
 ## Token discipline
 - Read the specific file range you need, not whole files; use search to locate first.

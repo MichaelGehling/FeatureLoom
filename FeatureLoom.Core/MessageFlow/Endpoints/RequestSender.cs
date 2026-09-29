@@ -22,7 +22,8 @@ public sealed class RequestSender<REQ, RESP> : IMessageSource<IRequestMessage<RE
     MicroLock responseHandlerLock = new MicroLock();
     TimeSpan timeout = 1.Seconds();
     short senderId = RandomGenerator.Int16();
-    ActionSchedule timeoutSchedule = null;
+    // Guarded by responseHandlerLock; only read/written while holding it.
+    bool timeoutLoopActive = false;
     readonly bool preciseTimeout = false;
 
     /// <summary>
@@ -43,45 +44,55 @@ public sealed class RequestSender<REQ, RESP> : IMessageSource<IRequestMessage<RE
     {
     }
 
-    private void StartTimeoutCheck()
+    /// <summary>
+    /// Must be called while holding <see cref="responseHandlerLock"/>.
+    /// Returns true if the caller has to start the timeout loop after releasing the lock.
+    /// </summary>
+    private bool TryActivateTimeoutLoop()
     {
-        if (timeoutSchedule != null) return;
+        if (timeoutLoopActive) return false;
+        timeoutLoopActive = true;
+        return true;
+    }
 
-        timeoutSchedule = Service<SchedulerService>.Instance.ScheduleAction("RequestSenderTimeout", now =>
+    /// <summary>
+    /// Cancels expired requests until none are pending.
+    /// An async wait is used instead of a scheduler entry on purpose: the pending timer (Task.Delay) roots this
+    /// loop and thereby the sender while requests are pending. The scheduler only holds schedules weakly, so an
+    /// otherwise unreferenced sender could be collected and its awaited requests would never time out.
+    /// Once no request is pending, the loop ends and the sender becomes collectable again.
+    /// Handlers are ordered by request time and share one timeout, so only the first one needs to be awaited.
+    /// Must be started outside of <see cref="responseHandlerLock"/>, because the wait may complete synchronously.
+    /// </summary>
+    private async Task RunTimeoutLoopAsync()
+    {
+        // The loop is only started for a newly added request, so the full timeout is the first wait.
+        TimeSpan waitTime = timeout;
+        while (true)
         {
-            if (responseHandlers.Count == 0 && !responseHandlerLock.IsLocked)
-            {
-                timeoutSchedule = null;
-                return ScheduleStatus.Terminated;
-            }
+            if (preciseTimeout) await AppTime.WaitPreciselyAsync(waitTime).ConfiguredAwait();
+            else await AppTime.WaitAsync(waitTime).ConfiguredAwait();
 
             using (responseHandlerLock.Lock())
             {
-                if (responseHandlers.Count == 0)
+                var now = GetNow();
+                int numExpired = 0;
+                while (numExpired < responseHandlers.Count && responseHandlers[numExpired].requestTime + timeout <= now)
                 {
-                    timeoutSchedule = null;
-                    return ScheduleStatus.Terminated;
+                    responseHandlers[numExpired].tcs.TrySetCanceled();
+                    numExpired++;
                 }
-
-                var nowEffective = preciseTimeout ? AppTime.Now : now;
-
-                for (int i = 0; i < responseHandlers.Count; i++)
-                {
-                    if (responseHandlers[i].requestTime + timeout > nowEffective) break;
-                    responseHandlers[i].tcs.TrySetCanceled();
-                    responseHandlers.RemoveAt(i--);
-                }
+                if (numExpired > 0) responseHandlers.RemoveRange(0, numExpired);
 
                 if (responseHandlers.Count == 0)
                 {
-                    timeoutSchedule = null;
-                    return ScheduleStatus.Terminated;
+                    timeoutLoopActive = false;
+                    return;
                 }
 
-                return ScheduleStatus.WaitFor((responseHandlers[0].requestTime + timeout) - nowEffective);
+                waitTime = (responseHandlers[0].requestTime + timeout) - now;
             }
-
-        });
+        }
     }
 
     /// <summary>
@@ -93,11 +104,13 @@ public sealed class RequestSender<REQ, RESP> : IMessageSource<IRequestMessage<RE
     {
         var handler = ResponseHandler.Create(CreateRequestId(), GetNow());
 
+        bool startTimeoutLoop;
         using (responseHandlerLock.Lock())
         {
             responseHandlers.Add(handler);
-            StartTimeoutCheck();
+            startTimeoutLoop = TryActivateTimeoutLoop();
         }
+        if (startTimeoutLoop) _ = RunTimeoutLoopAsync();
 
         var request = new RequestMessage<REQ>(message, handler.requestId);
 
@@ -119,11 +132,13 @@ public sealed class RequestSender<REQ, RESP> : IMessageSource<IRequestMessage<RE
     {
         var handler = ResponseHandler.Create(CreateRequestId(), GetNow());
 
+        bool startTimeoutLoop;
         using (responseHandlerLock.Lock())
         {
             responseHandlers.Add(handler);
-            StartTimeoutCheck();
+            startTimeoutLoop = TryActivateTimeoutLoop();
         }
+        if (startTimeoutLoop) _ = RunTimeoutLoopAsync();
 
         var request = new RequestMessage<REQ>(message, handler.requestId);
 

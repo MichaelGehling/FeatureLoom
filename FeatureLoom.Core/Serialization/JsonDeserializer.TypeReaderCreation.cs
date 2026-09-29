@@ -1011,10 +1011,18 @@ public sealed partial class JsonDeserializer
             }
 
             // Mark all fields that are equally available for all types
+#if NETSTANDARD2_0
+            // netstandard2.0 may run on .NET Framework, where overwriting a value invalidates a running enumerator.
+            foreach (var key in fieldNameToIsTypeMember.Keys.ToArray())
+            {
+                if (fieldNameToIsTypeMember[key].All(v => v == true)) fieldNameToIsTypeMember[key] = null;
+            }
+#else
             foreach (var pair in fieldNameToIsTypeMember)
             {
                 if (pair.Value.All(v => v == true)) fieldNameToIsTypeMember[pair.Key] = null;
             }
+#endif
         }
 
         Pool<List<int>> ratingsPool = new Pool<List<int>>(() => new(), l => l.Clear(), 1000, false);
@@ -1554,34 +1562,34 @@ public sealed partial class JsonDeserializer
         var memberInfos = new List<MemberInfo>();
         if (dataAccess == DataAccess.PublicFieldsAndProperties)
         {
-            memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            memberInfos.AddRange(itemType.GetPropertiesInDeclarationOrder(BindingFlags.Public | BindingFlags.Instance)
                 .Where(prop => prop.SetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
-            memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+            memberInfos.AddRange(itemType.GetFieldsInDeclarationOrder(BindingFlags.Public | BindingFlags.Instance)
                 .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
 
-            memberInfos.AddRange(itemType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+            memberInfos.AddRange(itemType.GetPropertiesInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                 .Where(prop => prop.SetMethod != null && prop.IsDefined(typeof(JsonIncludeAttribute), true)));
-            memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+            memberInfos.AddRange(itemType.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                 .Where(field => field.IsDefined(typeof(JsonIncludeAttribute), true)));
         }
         else
         {
-            memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+            memberInfos.AddRange(itemType.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
                 .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
             Type t = itemType.BaseType;
             while (t != null)
             {
-                memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                memberInfos.AddRange(t.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(baseField => !baseField.IsDefined(typeof(JsonIgnoreAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));
                 t = t.BaseType;
             }
 
-            memberInfos.AddRange(itemType.GetProperties(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+            memberInfos.AddRange(itemType.GetPropertiesInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
                 .Where(prop => prop.IsDefined(typeof(JsonIncludeAttribute), true)));
             t = itemType.BaseType;
             while (t != null)
             {
-                memberInfos.AddRange(t.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+                memberInfos.AddRange(t.GetPropertiesInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(baseProp => baseProp.IsDefined(typeof(JsonIncludeAttribute), true) && !memberInfos.Any(field => field.Name == baseProp.Name)));
                 t = t.BaseType;
             }

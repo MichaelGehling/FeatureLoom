@@ -35,6 +35,17 @@ namespace FeatureLoom.Scheduling
         private TimeSpan minimumDelay = 0.01.Milliseconds();
         private TimeSpan maximumDelay = 60.Seconds();
 
+        // If true, schedules are held strongly until they return Terminated. Only for internal owners
+        // (e.g. FeatureLock) whose schedules must not be collected while waiters depend on them.
+        private readonly bool keepSchedulesAlive;
+
+        public SchedulerService() : this(false) { }
+
+        internal SchedulerService(bool keepSchedulesAlive)
+        {
+            this.keepSchedulesAlive = keepSchedulesAlive;
+        }
+
         public void AddSchedule(ISchedule schedule)
         {
             using (myLock.Lock())
@@ -138,7 +149,7 @@ namespace FeatureLoom.Scheduling
                     {
                         if (!activeSchedules.Any(weak => weak.TryGetSchedule(out var schedule) && schedule == newSchedule))
                         {
-                            activeSchedules.Add(new ScheduleContainer(newSchedule));
+                            activeSchedules.Add(new ScheduleContainer(newSchedule, keepSchedulesAlive));
                         }
                     }
                     newSchedules.Clear();
@@ -182,19 +193,26 @@ namespace FeatureLoom.Scheduling
         private class ScheduleContainer
         {
             WeakReference<ISchedule> scheduleRef;
+            ISchedule strongRef;
             string name;
             public ScheduleStatus scheduleStatus;
             public string Name => name;
 
 
-            public ScheduleContainer(ISchedule schedule)
+            public ScheduleContainer(ISchedule schedule, bool keepAlive)
             {
-                this.scheduleRef = new WeakReference<ISchedule>(schedule);
+                if (keepAlive) this.strongRef = schedule;
+                else this.scheduleRef = new WeakReference<ISchedule>(schedule);
                 this.name = schedule.Name;
             }            
 
             public bool TryGetSchedule(out ISchedule schedule)
             {
+                if (strongRef != null)
+                {
+                    schedule = strongRef;
+                    return true;
+                }
                 if (scheduleRef.TryGetTarget(out schedule))
                 {
                     this.name = schedule.Name;

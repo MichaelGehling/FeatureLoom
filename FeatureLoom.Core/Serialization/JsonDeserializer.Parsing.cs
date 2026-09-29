@@ -2159,6 +2159,8 @@ public sealed partial class JsonDeserializer
 
         if (double.TryParse(sb.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double result))
         {
+            // .NET Framework's parser drops the sign when a negative value underflows to zero.
+            if (result == 0.0 && isNegative) return -0.0;          
             return result;
         }
 #endif

@@ -10,6 +10,70 @@ namespace FeatureLoom.Synchronization
     public class FeatureLockTests
     {
         [Fact]
+        public async Task AsyncWaiters_complete_even_if_lock_is_unreferenced_and_GC_runs()
+        {
+            var tasks = StartUnreferencedLockContention(20);
+            using var cts = new CancellationTokenSource();
+            var gcTask = Task.Run(() => { while (!cts.IsCancellationRequested) { GC.Collect(); GC.WaitForPendingFinalizers(); Thread.Sleep(1); } });
+            var all = Task.WhenAll(tasks);
+            var finished = await Task.WhenAny(all, Task.Delay(10000));
+            cts.Cancel();
+            await gcTask;
+            Assert.Same(all, finished);
+        }
+
+        [Fact]
+        public async Task Lock_becomes_collectable_after_waiters_completed()
+        {
+            var weakLock = await RunContentionAndReturnWeakRef();
+            await Task.Delay(100);
+            for (int i = 0; i < 10 && weakLock.IsAlive; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                await Task.Delay(20);
+            }
+            Assert.False(weakLock.IsAlive);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static Task[] StartUnreferencedLockContention(int waiters)
+        {
+            var myLock = new FeatureLock();
+            var tasks = new Task[waiters + 1];
+            var holder = myLock.Lock();
+            for (int i = 0; i < waiters; i++)
+            {
+                tasks[i] = Task.Run(async () => { using (await myLock.LockAsync()) { await Task.Yield(); } });
+            }
+            tasks[waiters] = Task.Run(async () => { await Task.Delay(50); holder.Exit(); });
+            return tasks;
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static async Task<WeakReference> RunContentionAndReturnWeakRef()
+        {
+            var tasks = StartUnreferencedLockContentionWithRef(5, out var weakLock);
+            await Task.WhenAll(tasks);
+            return weakLock;
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static Task[] StartUnreferencedLockContentionWithRef(int waiters, out WeakReference weakLock)
+        {
+            var myLock = new FeatureLock();
+            weakLock = new WeakReference(myLock);
+            var tasks = new Task[waiters + 1];
+            var holder = myLock.Lock();
+            for (int i = 0; i < waiters; i++)
+            {
+                tasks[i] = Task.Run(async () => { using (await myLock.LockAsync()) { await Task.Yield(); } });
+            }
+            tasks[waiters] = Task.Run(async () => { await Task.Delay(50); holder.Exit(); });
+            return tasks;
+        }
+
+        [Fact]
         public void LockAttemptBlocksWhileLockInUse()
         {
             var myLock = new FeatureLock();

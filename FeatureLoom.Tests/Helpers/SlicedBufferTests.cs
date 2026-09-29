@@ -112,8 +112,8 @@ public class SlicedBufferTests
         System.Threading.Tasks.Parallel.For(0, numSlices, i =>
         {
             var slice = buffer.GetSlice(8);
-            slice[0] = (byte)i;
-            results[i] = slice[0];
+            slice.AsSpan()[0] = (byte)i;
+            results[i] = slice.AsSpan()[0];
         });
         Assert.Equal(Enumerable.Range(0, numSlices), results);
     }

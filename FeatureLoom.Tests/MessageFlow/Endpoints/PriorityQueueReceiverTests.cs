@@ -55,7 +55,7 @@ namespace FeatureLoom.MessageFlow
             sendMessages.Sort();
             for (int i = 0; i < receivedMessages.Count; i++)
             {
-                Assert.Equal(sendMessages[sendMessages.Count - 1 - i], receivedMessages[i]);
+                Assert.Equal(sendMessages[sendMessages.Count - 1 - i], receivedMessages.AsSpan()[i]);
             }
         }
 
@@ -169,7 +169,7 @@ namespace FeatureLoom.MessageFlow
 
             var remaining = receiver.ReceiveAll();
             Assert.Equal(limit, remaining.Count);
-            Assert.Equal(99, remaining[0]);
+            Assert.Equal(99, remaining.AsSpan()[0]);
         }
 
         [Fact]

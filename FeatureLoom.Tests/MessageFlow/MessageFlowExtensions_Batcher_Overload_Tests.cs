@@ -13,7 +13,7 @@ public class MessageFlowExtensions_Batcher_Overload_Tests
         var source = new Sender();
         var batched = source.BatchMessages<int>(
             maxBatchSize: 10,
-            maxCollectionTime: TimeSpan.FromMilliseconds(120),
+            maxCollectionTime: TimeSpan.FromMilliseconds(100),
             sendSingleMessagesAsArray: false);
 
         var recv = new QueueReceiver<object>();
@@ -22,7 +22,7 @@ public class MessageFlowExtensions_Batcher_Overload_Tests
         source.Send(7);
 
         // Allow time-based flush
-        await Task.Delay(200);
+        await Task.Delay(300);
 
         Assert.True(recv.TryReceive(out var first));
         // With sendSingleMessagesAsArray=false and a 1-item batch, we expect a single T (int), not int[]

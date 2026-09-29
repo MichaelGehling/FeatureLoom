@@ -58,7 +58,7 @@ namespace FeatureLoom.MessageFlow
 
             for (int i = 0; i < limit.ClampHigh(numMessages); i++)
             {
-                Assert.Equal(sendMessages[i + offset], receivedMessages[i]);
+                Assert.Equal(sendMessages[i + offset], receivedMessages.AsSpan()[i]);
             }
         }
 

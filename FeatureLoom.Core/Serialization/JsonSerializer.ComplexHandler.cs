@@ -78,22 +78,22 @@ namespace FeatureLoom.Serialization
             var memberInfos = new List<MemberInfo>();
             if (dataSelection == DataSelection.PublicFieldsAndProperties)
             {
-                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetPropertiesInDeclarationOrder(BindingFlags.Public | BindingFlags.Instance)
                     .Where(prop => prop.GetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetFieldsInDeclarationOrder(BindingFlags.Public | BindingFlags.Instance)
                     .Where(field =>!field.IsDefined(typeof(JsonIgnoreAttribute), true)));
 
                 // Also take private fields and properties with JsonIncludeAttribute
-                memberInfos.AddRange(itemType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetPropertiesInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(prop => prop.GetMethod != null && prop.IsDefined(typeof(JsonIncludeAttribute), true)));
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(field => field.IsDefined(typeof(JsonIncludeAttribute), true)));
                 Type t = itemType.BaseType;
                 while (t != null)
                 {
-                    memberInfos.AddRange(t.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+                    memberInfos.AddRange(t.GetPropertiesInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                         .Where(baseProp => baseProp.GetMethod != null && baseProp.IsDefined(typeof(JsonIncludeAttribute), true) && !memberInfos.Any(field => field.Name == baseProp.Name)));
-                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                    memberInfos.AddRange(t.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                         .Where(baseField => baseField.IsDefined(typeof(JsonIncludeAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));                    
                     t = t.BaseType;
                 }
@@ -103,23 +103,23 @@ namespace FeatureLoom.Serialization
             }
             else
             {
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
                     .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
                 Type t = itemType.BaseType;
                 while (t != null)
                 {
-                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                    memberInfos.AddRange(t.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                         .Where(baseField => !baseField.IsDefined(typeof(JsonIgnoreAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));
                     t = t.BaseType;
                 }
 
                 // Also take public and private properties with JsonIncludeAttribute
-                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetPropertiesInDeclarationOrder(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     .Where(prop => prop.GetMethod != null && prop.IsDefined(typeof(JsonIncludeAttribute), true)));
                 t = itemType.BaseType;
                 while (t != null)
                 {
-                    memberInfos.AddRange(t.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+                    memberInfos.AddRange(t.GetPropertiesInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                         .Where(baseProp => baseProp.GetMethod != null && 
                                            baseProp.IsDefined(typeof(JsonIncludeAttribute), true) && 
                                            !memberInfos.Any(field => field.Name == baseProp.Name)));
@@ -141,12 +141,12 @@ namespace FeatureLoom.Serialization
 
                         // remove backing fields whose properties have the JsonIgnoreAttribute
                         var ignoredProperties = new List<MemberInfo>();
-                        ignoredProperties.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                        ignoredProperties.AddRange(itemType.GetPropertiesInDeclarationOrder(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                             .Where(prop => prop.GetMethod != null && prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
                         t = itemType.BaseType;
                         while (t != null)
                         {
-                            ignoredProperties.AddRange(t.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+                            ignoredProperties.AddRange(t.GetPropertiesInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                                 .Where(baseProp => baseProp.GetMethod != null &&
                                                    baseProp.IsDefined(typeof(JsonIgnoreAttribute), true)));
                             t = t.BaseType;
@@ -187,19 +187,19 @@ namespace FeatureLoom.Serialization
             var memberInfos = new List<MemberInfo>();
             if (dataSelection == DataSelection.PublicFieldsAndProperties)
             {
-                memberInfos.AddRange(itemType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetPropertiesInDeclarationOrder(BindingFlags.Public | BindingFlags.Instance)
                     .Where(prop => prop.GetMethod != null && !prop.IsDefined(typeof(JsonIgnoreAttribute), true)));
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetFieldsInDeclarationOrder(BindingFlags.Public | BindingFlags.Instance)
                     .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
             }
             else
             {
-                memberInfos.AddRange(itemType.GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                memberInfos.AddRange(itemType.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
                     .Where(field => !field.IsDefined(typeof(JsonIgnoreAttribute), true)));
                 Type t = itemType.BaseType;
                 while (t != null)
                 {
-                    memberInfos.AddRange(t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                    memberInfos.AddRange(t.GetFieldsInDeclarationOrder(BindingFlags.NonPublic | BindingFlags.Instance)
                         .Where(baseField => !baseField.IsDefined(typeof(JsonIgnoreAttribute), true) && !memberInfos.Any(field => field.Name == baseField.Name)));
                     t = t.BaseType;
                 }

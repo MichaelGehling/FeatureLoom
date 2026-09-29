@@ -2894,7 +2894,19 @@ public sealed partial class JsonSerializer
         private void WriteShortestRoundTrippable(double value)
         {
 #if NETSTANDARD2_0
-            WriteString(value.ToString("R", CultureInfo.InvariantCulture));
+            // .NET Framework's "R" jumps from G15 directly to G17 and so is not always the shortest
+            // round-trippable form (e.g. 1.012345678901234 -> "1.0123456789012339"). Try G16 in between.
+            // TryParse: near double.MaxValue G15/G16 may round beyond range, which Parse on net48 rejects.
+            string s = value.ToString("G15", CultureInfo.InvariantCulture);
+            if (!double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) || parsed != value)
+            {
+                s = value.ToString("G16", CultureInfo.InvariantCulture);
+                if (!double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) || parsed != value)
+                {
+                    s = value.ToString("G17", CultureInfo.InvariantCulture);
+                }
+            }
+            WriteString(s);
 #else
             if (Utf8Formatter.TryFormat(value, new Span<byte>(mainBuffer, mainBufferCount, mainBuffer.Length - mainBufferCount), out int written))
             {

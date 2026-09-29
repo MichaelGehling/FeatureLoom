@@ -65,7 +65,15 @@ public class ServiceRegistryDeadlockTests
 
     private static async Task RunScenarioInProcess(string scenario, string workingDirectory)
     {
+#if NETFRAMEWORK
+        // On .NET Framework the test assembly is a native executable and is started directly.
+        // xUnit shadow-copies assemblies there, so Location points to a temp copy without its dependencies;
+        // CodeBase keeps the original output path.
+        var testExePath = new Uri(typeof(ServiceRegistryDeadlockTests).Assembly.CodeBase).LocalPath;
+        var startInfo = new ProcessStartInfo(testExePath, $"--service-registry-scenario \"{scenario}\"")
+#else
         var startInfo = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
+#endif
         {
             // Process isolation must include relative storage and log paths, not just static registry state.
             WorkingDirectory = workingDirectory,
@@ -73,9 +81,11 @@ public class ServiceRegistryDeadlockTests
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
+#if !NETFRAMEWORK
         startInfo.ArgumentList.Add(typeof(ServiceRegistryDeadlockTests).Assembly.Location);
         startInfo.ArgumentList.Add("--service-registry-scenario");
         startInfo.ArgumentList.Add(scenario);
+#endif
         using var process = Process.Start(startInfo);
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
@@ -84,7 +94,11 @@ public class ServiceRegistryDeadlockTests
         if (completed != exited)
         {
             // A deadlocked registry must not poison the test host or leave a spinning worker behind.
+#if NETFRAMEWORK
+            process.Kill(); // The scenario process does not spawn children.
+#else
             process.Kill(entireProcessTree: true);
+#endif
             await exited;
             Assert.Fail($"{scenario} timed out.\n{await output}\n{await error}");
         }

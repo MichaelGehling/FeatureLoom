@@ -1,6 +1,8 @@
 ﻿using FeatureLoom.Diagnostics;
 using FeatureLoom.Helpers;
 using FeatureLoom.Time;
+using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -38,6 +40,71 @@ namespace FeatureLoom.MessageFlow
 
             var ex = await Assert.ThrowsAsync<TaskCanceledException>(() => task);
             Assert.IsType<TaskCanceledException>(ex);
+        }
+
+        [Fact]
+        public async Task Times_out_even_if_sender_is_unreferenced_and_GC_runs()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            // The sender is only reachable through its own pending request, so a forced GC must not collect the timeout handling.
+            var task = SendWithUnreferencedSender();
+            for (int i = 0; i < 3; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                await Task.Delay(20);
+            }
+
+            var completed = await Task.WhenAny(task, Task.Delay(5.Seconds()));
+            Assert.Same(task, completed);
+            await Assert.ThrowsAsync<TaskCanceledException>(() => task);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static Task<int> SendWithUnreferencedSender() => new RequestSender<int, int>(timeout: 200.Milliseconds()).SendRequestAsync(1);
+
+        [Fact]
+        public async Task Sender_becomes_collectable_after_pending_requests_timed_out()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var weakSender = await SendAndAwaitTimeout();
+            for (int i = 0; i < 3 && weakSender.IsAlive; i++)
+            {
+                await Task.Delay(50);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+            }
+
+            Assert.False(weakSender.IsAlive);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static async Task<WeakReference> SendAndAwaitTimeout()
+        {
+            var sender = new RequestSender<int, int>(timeout: 30.Milliseconds());
+            await Assert.ThrowsAsync<TaskCanceledException>(() => sender.SendRequestAsync(1));
+            return new WeakReference(sender);
+        }
+
+        [Fact]
+        public async Task Staggered_requests_time_out_individually()
+        {
+            using var testContext = TestHelper.PrepareTestContext();
+
+            var requester = new RequestSender<int, int>(timeout: 150.Milliseconds());
+            var first = requester.SendRequestAsync(1);
+            await Task.Delay(100);
+            var second = requester.SendRequestAsync(2);
+
+            await Assert.ThrowsAsync<TaskCanceledException>(() => first);
+            Assert.False(second.IsCompleted);
+            await Assert.ThrowsAsync<TaskCanceledException>(() => second);
+
+            // A new request after the loop ended must restart the timeout handling.
+            await Assert.ThrowsAsync<TaskCanceledException>(() => requester.SendRequestAsync(3));
         }
 
         [Fact]

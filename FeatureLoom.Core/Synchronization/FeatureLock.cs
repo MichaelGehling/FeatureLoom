@@ -159,7 +159,15 @@ namespace FeatureLoom.Synchronization
         // load cannot delay lock-wakeup timing.
         // NOTE: Must NOT be readonly — LazyValue<T> is a struct, and readonly would cause defensive
         // copies on every access, so each call would see obj==null and create a fresh, discarded instance.
-        private static LazyValue<SchedulerService> privateScheduler = new();
+        // Holds schedules strongly: a lock with sleeping (esp. async) waiters may otherwise be collected
+        // between the holder's release and the next trigger, leaving the waiters hanging forever.
+        // No leak: Trigger() returns Terminated once the sleep queue is empty, which drops the reference.
+        private static LazyValue<KeepAliveScheduler> privateScheduler = new();
+
+        private sealed class KeepAliveScheduler : SchedulerService
+        {
+            public KeepAliveScheduler() : base(true) { }
+        }
 
         // the main lock variable, indicating current locking state:
         // 0 means no lock

@@ -83,7 +83,7 @@ namespace FeatureLoom.MessageFlow
             var seg = receiver.ReceiveMany(10);
             Assert.True(seg.Array != null);
             Assert.Equal(1, seg.Count);
-            Assert.Equal(20, seg[0]);
+            Assert.Equal(20, seg.AsSpan()[0]);
 
             Assert.True(receiver.IsEmpty);
             Assert.False(receiver.TryReceive(out _));

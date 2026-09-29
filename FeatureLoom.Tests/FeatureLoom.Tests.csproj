@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net10.0;net9.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>net10.0;net9.0;net8.0;net48</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <StartupObject>FeatureLoom.DependencyInversion.ServiceRegistryTestProcess</StartupObject>
 
@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
+    <!-- Used directly by the Newtonsoft interop tests; on .NET it only arrived transitively via the test SDK. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
@@ -32,6 +34,7 @@
       net10.0 -> Core net8.0
       net9.0  -> Core netstandard2.1
       net8.0  -> Core netstandard2.0
+      net48   -> Core netstandard2.0 (real .NET Framework runtime)
     The test TFM is only the host runtime; the Core TFM is forced via SetTargetFramework.
     Override for a single run: dotnet test -f net10.0 -p:CoreTargetFramework=netstandard2.0
     Transitive references are disabled so the nearest-match rule cannot silently pick another Core build.
@@ -40,6 +43,7 @@
     <CoreTargetFramework Condition="'$(TargetFramework)' == 'net10.0'">net8.0</CoreTargetFramework>
     <CoreTargetFramework Condition="'$(TargetFramework)' == 'net9.0'">netstandard2.1</CoreTargetFramework>
     <CoreTargetFramework Condition="'$(TargetFramework)' == 'net8.0'">netstandard2.0</CoreTargetFramework>
+    <CoreTargetFramework Condition="'$(TargetFramework)' == 'net48'">netstandard2.0</CoreTargetFramework>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(CoreTargetFramework)' != ''">
