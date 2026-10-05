@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Extensions;
+using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using System;
 using System.Collections;
@@ -157,6 +157,10 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// </summary>
     /// <param name="index">The zero-based index within the segment.</param>
     /// <returns>The character at the specified index.</returns>
+    /// <remarks>
+    /// For performance reasons the index is not validated against the segment bounds. Only the bounds of the
+    /// underlying string are checked, so an out-of-segment index may return a character outside of this segment.
+    /// </remarks>
     public char this[int index] => text[startIndex + index];
 
     /// <summary>
@@ -164,8 +168,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// </summary>
     /// <param name="startIndex">The starting index of the subsegment, relative to this segment.</param>
     /// <returns>A new <see cref="TextSegment"/> representing the subsegment.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="startIndex"/> is greater than <see cref="Length"/>.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public TextSegment SubSegment(int startIndex) => new TextSegment(text, this.startIndex + startIndex);
+    public TextSegment SubSegment(int startIndex) => new TextSegment(text, this.startIndex + startIndex, length - startIndex);
 
     /// <summary>
     /// Returns a subsegment starting at the specified index with the specified length.
@@ -173,6 +178,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// <param name="startIndex">The starting index of the subsegment, relative to this segment.</param>
     /// <param name="length">The length of the subsegment.</param>
     /// <returns>A new <see cref="TextSegment"/> representing the subsegment.</returns>
+    /// <remarks>
+    /// Only the bounds of the underlying string are validated, not the bounds of this segment.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TextSegment SubSegment(int startIndex, int length) => new TextSegment(text, this.startIndex + startIndex, length);
 
@@ -183,14 +191,23 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// <param name="startIndex">The starting index to begin searching from, relative to this segment.</param>
     /// <param name="startAfter">The segment after which the subsegment should start. If empty or null, starts from <paramref name="startIndex"/>.</param>
     /// <param name="endBefore">The segment before which the subsegment should end. If empty or null, ends at the end of this segment.</param>
-    /// <param name="restStartIndex">Outputs the index after the end of the subsegment, relative to this segment.</param>
+    /// <param name="restStartIndex">
+    /// Outputs the index (relative to this segment) where processing can continue: the start of the found
+    /// <paramref name="endBefore"/> occurrence, or the end of this segment if <paramref name="endBefore"/> is empty.
+    /// If a marker is not found, it is the index where the failed search started.
+    /// </param>
     /// <param name="includeSearchStrings">If true, includes the search strings in the result.</param>
     /// <returns>
-    /// A <see cref="TextSegment"/> representing the subsegment, or null if not found.
+    /// A <see cref="TextSegment"/> representing the subsegment, or null if one of the markers was not found.
     /// </returns>
+    /// <remarks>
+    /// <paramref name="endBefore"/> is always searched after the end of the found <paramref name="startAfter"/> occurrence,
+    /// independent of <paramref name="includeSearchStrings"/>.
+    /// </remarks>
     public TextSegment? SubSegment(int startIndex, TextSegment startAfter, TextSegment endBefore, out int restStartIndex, bool includeSearchStrings = false)
     {
         int startPos = startIndex;
+        int searchEndFrom = startIndex;
         int endPos = Count;
 
         // Find startAfter
@@ -201,17 +218,17 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
                 restStartIndex = startIndex;
                 return null;
             }
-            startPos = foundStart + startAfter.Count;
-            if (includeSearchStrings) startPos -= startAfter.Count;
+            searchEndFrom = foundStart + startAfter.Count;
+            startPos = includeSearchStrings ? foundStart : searchEndFrom;
         }
 
-        // Find endBefore
+        // Find endBefore (never inside the startAfter marker, even if it is included in the result)
         int foundEnd = -1;
         if (!endBefore.IsEmptyOrInvalid)
         {
-            if (!TryFindIndex(endBefore, startPos, out foundEnd))
+            if (!TryFindIndex(endBefore, searchEndFrom, out foundEnd))
             {
-                restStartIndex = startPos;
+                restStartIndex = searchEndFrom;
                 return null;
             }
             endPos = foundEnd;
@@ -291,39 +308,40 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// <param name="other">The segment to search for.</param>
     /// <param name="index">The index of the first occurrence, if found.</param>
     /// <returns>True if found; otherwise, false.</returns>
+    /// <remarks>
+    /// Same semantics as <see cref="string.IndexOf(string, StringComparison)"/> with ordinal comparison:
+    /// an empty <paramref name="other"/> is always found at index 0 (also within an empty segment).
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryFindIndex(TextSegment other, out int index)
-    {
-        for (index = 0; index < length; index++)
-        {
-            if (index + other.length > length) return false;
-            bool found = true;
-            for (int j = 0; j < other.length; j++)
-            {
-                if (this[index + j] != other[j])
-                {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) return true;
-        }
-        return false;
-    }
+    public bool TryFindIndex(TextSegment other, out int index) => TryFindIndex(other, 0, out index);
 
     /// <summary>
-    /// Tries to find the index of the first occurrence of another <see cref="TextSegment"/> within this segment.
+    /// Tries to find the index of the first occurrence of another <see cref="TextSegment"/> within this segment,
+    /// starting the search at <paramref name="firstIndex"/>.
     /// </summary>
     /// <param name="other">The segment to search for.</param>
-    /// <param name="firstIndex">The index where to start from</param>
-    /// <param name="index">The index of the first occurrence, if found.</param>
+    /// <param name="firstIndex">The index (relative to this segment) where the search starts. Must be in the range [0, <see cref="Length"/>].</param>
+    /// <param name="index">The index of the first occurrence, if found; otherwise -1.</param>
     /// <returns>True if found; otherwise, false.</returns>
+    /// <remarks>
+    /// Same semantics as <see cref="string.IndexOf(string, int, StringComparison)"/> with ordinal comparison:
+    /// an empty <paramref name="other"/> is always found at <paramref name="firstIndex"/>.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="firstIndex"/> is negative or greater than <see cref="Length"/>.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryFindIndex(TextSegment other, int firstIndex, out int index)
     {
-        for (index = firstIndex; index < length; index++)
+        if ((uint)firstIndex > (uint)length) throw new ArgumentOutOfRangeException(nameof(firstIndex));
+
+        if (other.length == 0)
         {
-            if (index + other.length > length) return false;
+            index = firstIndex;
+            return true;
+        }
+
+        int lastStart = length - other.length;
+        for (index = firstIndex; index <= lastStart; index++)
+        {
             bool found = true;
             for (int j = 0; j < other.length; j++)
             {
@@ -335,6 +353,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
             }
             if (found) return true;
         }
+        index = -1;
         return false;
     }
 
@@ -342,7 +361,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// Tries to find the index of the first occurrence of a character within this segment.
     /// </summary>
     /// <param name="c">The character to search for.</param>
-    /// <param name="index">The index of the first occurrence, if found.</param>
+    /// <param name="index">The index of the first occurrence, if found; otherwise -1.</param>
     /// <returns>True if found; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryFindIndex(char c, out int index)
@@ -351,23 +370,29 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         {
             if (this[index] == c) return true;
         }
+        index = -1;
         return false;
     }
 
     /// <summary>
-    /// Tries to find the index of the first occurrence of a character within this segment.
+    /// Tries to find the index of the first occurrence of a character within this segment,
+    /// starting the search at <paramref name="firstIndex"/>.
     /// </summary>
     /// <param name="c">The character to search for.</param>
-    /// <param name="firstIndex">The index where to start from</param>
-    /// <param name="index">The index of the first occurrence, if found.</param>
+    /// <param name="firstIndex">The index (relative to this segment) where the search starts. Must be in the range [0, <see cref="Length"/>].</param>
+    /// <param name="index">The index of the first occurrence, if found; otherwise -1.</param>
     /// <returns>True if found; otherwise, false.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="firstIndex"/> is negative or greater than <see cref="Length"/>.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryFindIndex(char c, int firstIndex, out int index)
     {
+        if ((uint)firstIndex > (uint)length) throw new ArgumentOutOfRangeException(nameof(firstIndex));
+
         for (index = firstIndex; index < length; index++)
         {
             if (this[index] == c) return true;
         }
+        index = -1;
         return false;
     }
 
@@ -481,6 +506,10 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// <returns>
     /// <c>true</c> if extraction and conversion succeeded; otherwise, <c>false</c>.
     /// </returns>
+    /// <remarks>
+    /// Conversion uses <see cref="CultureInfo.InvariantCulture"/>. See
+    /// <see cref="SubSegment(int, TextSegment, TextSegment, out int, bool)"/> for the boundary semantics.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryExtract<T>(int startIndex, TextSegment startExtractAfter, TextSegment endExtractBefore, out T extract, out int restStartIndex, bool includeSearchStrings = false) where T : IConvertible
     {
@@ -490,16 +519,45 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         return subsegment.Value.TryToType(out extract, CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// Attempts to extract a value of type <typeparamref name="T"/> located between <paramref name="startExtractAfter"/>
+    /// and <paramref name="endExtractBefore"/>, searching from the start of this segment.
+    /// </summary>
+    /// <typeparam name="T">The type to convert the extracted subsegment to.</typeparam>
+    /// <param name="startExtractAfter">The segment after which extraction should start. If empty, starts at the beginning.</param>
+    /// <param name="endExtractBefore">The segment before which extraction should end. If empty, ends at the end of this segment.</param>
+    /// <param name="extract">The extracted and converted value, if successful.</param>
+    /// <returns><c>true</c> if extraction and conversion succeeded; otherwise, <c>false</c>.</returns>
     public bool TryExtract<T>(TextSegment startExtractAfter, TextSegment endExtractBefore, out T extract) where T : IConvertible
     {
         return TryExtract(0, startExtractAfter, endExtractBefore, out extract, out _);
     }
 
+    /// <summary>
+    /// Attempts to extract a value of type <typeparamref name="T"/> located between <paramref name="startExtractAfter"/>
+    /// and <paramref name="endExtractBefore"/>, searching from <paramref name="startIndex"/>.
+    /// </summary>
+    /// <typeparam name="T">The type to convert the extracted subsegment to.</typeparam>
+    /// <param name="startIndex">The starting index to begin searching from, relative to this segment.</param>
+    /// <param name="startExtractAfter">The segment after which extraction should start. If empty, starts at <paramref name="startIndex"/>.</param>
+    /// <param name="endExtractBefore">The segment before which extraction should end. If empty, ends at the end of this segment.</param>
+    /// <param name="extract">The extracted and converted value, if successful.</param>
+    /// <returns><c>true</c> if extraction and conversion succeeded; otherwise, <c>false</c>.</returns>
     public bool TryExtract<T>(int startIndex, TextSegment startExtractAfter, TextSegment endExtractBefore, out T extract) where T : IConvertible
     {
         return TryExtract(startIndex, startExtractAfter, endExtractBefore, out extract, out _);
     }
 
+    /// <summary>
+    /// Attempts to extract a value of type <typeparamref name="T"/> located between <paramref name="startExtractAfter"/>
+    /// and <paramref name="endExtractBefore"/>, searching from the start of this segment.
+    /// </summary>
+    /// <typeparam name="T">The type to convert the extracted subsegment to.</typeparam>
+    /// <param name="startExtractAfter">The segment after which extraction should start. If empty, starts at the beginning.</param>
+    /// <param name="endExtractBefore">The segment before which extraction should end. If empty, ends at the end of this segment.</param>
+    /// <param name="extract">The extracted and converted value, if successful.</param>
+    /// <param name="restStartIndex">Outputs the index where processing can continue (see <see cref="SubSegment(int, TextSegment, TextSegment, out int, bool)"/>).</param>
+    /// <returns><c>true</c> if extraction and conversion succeeded; otherwise, <c>false</c>.</returns>
     public bool TryExtract<T>(TextSegment startExtractAfter, TextSegment endExtractBefore, out T extract, out int restStartIndex) where T : IConvertible
     {
         return TryExtract(0, startExtractAfter, endExtractBefore, out extract, out restStartIndex);
@@ -534,8 +592,9 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     }
 
     /// <summary>
-    /// Returns a new <see cref="TextSegment"/> with all leading characters equal to <paramref name="trimChars"/> removed.
+    /// Returns a new <see cref="TextSegment"/> with all leading or trailing characters contained in <paramref name="trimChars"/> removed.
     /// </summary>
+    /// <param name="trimChars">The characters to remove. If null or empty, the segment is returned unchanged (unlike <see cref="string.Trim(char[])"/>, whitespace is not trimmed).</param>
     public TextSegment Trim(params char[] trimChars)
     {
         if (IsEmptyOrInvalid || trimChars == null || trimChars.Length == 0) return this;
@@ -767,9 +826,44 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         return new TextSegment(text, newStart, newLength);
     }
 
-    public bool StartsWith(TextSegment segment) => TryFindIndex(segment, out int index) && index == 0;
-    public bool EndsWith(TextSegment segment) => TryFindIndex(segment, out int index) && index + segment.length == length;
+    /// <summary>
+    /// Determines whether this segment starts with the specified segment (ordinal comparison).
+    /// </summary>
+    /// <param name="segment">The prefix to check for.</param>
+    /// <returns>True if this segment starts with <paramref name="segment"/> or if <paramref name="segment"/> is empty; otherwise, false.</returns>
+    public bool StartsWith(TextSegment segment)
+    {
+        if (segment.length == 0) return true; // Same as string.StartsWith/EndsWith("").
+        if (segment.length > length) return false;
+        for (int i = 0; i < segment.length; i++)
+        {
+            if (this[i] != segment[i]) return false;
+        }
+        return true;
+    }
 
+    /// <summary>
+    /// Determines whether this segment ends with the specified segment (ordinal comparison).
+    /// </summary>
+    /// <param name="segment">The suffix to check for.</param>
+    /// <returns>True if this segment ends with <paramref name="segment"/> or if <paramref name="segment"/> is empty; otherwise, false.</returns>
+    public bool EndsWith(TextSegment segment)
+    {
+        if (segment.length == 0) return true; // Same as string.StartsWith/EndsWith("").
+        if (segment.length > length) return false;
+        int offset = length - segment.length;
+        for (int i = 0; i < segment.length; i++)
+        {
+            if (this[offset + i] != segment[i]) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Determines whether this segment contains the specified segment (ordinal comparison).
+    /// </summary>
+    /// <param name="segment">The segment to search for.</param>
+    /// <returns>True if <paramref name="segment"/> occurs within this segment or is empty; otherwise, false.</returns>
     public bool Contains(TextSegment segment) => TryFindIndex(segment, out _);
 
     /// <summary>
@@ -847,6 +941,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         public void Reset()
         {
             remaining = original;
+            current = TextSegment.Empty;
             finished = false;
         }
 
@@ -915,7 +1010,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     public static bool operator ==(TextSegment left, TextSegment right)
     {
         if (left.length != right.length) return false;
-        if (left.GetHashCode() != right.GetHashCode()) return false;
+        // Only use cached hash codes as a shortcut; computing them here would cost more than a direct comparison.
+        if (left.hashCode.HasValue && right.hashCode.HasValue && left.hashCode.Value != right.hashCode.Value) return false;
 
         for (int i = 0; i < left.length; i++)
         {
@@ -937,10 +1033,11 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     public bool Equals(TextSegment other) => this == other;
 
     /// <summary>
-    /// Determines whether this segment is equal to a <see cref="string"/>.
+    /// Determines whether this segment is equal to a <see cref="string"/> (ordinal comparison).
     /// </summary>
+    /// <param name="other">The string to compare with. A null string is never equal.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(string other) => this == new TextSegment(other);
+    public bool Equals(string other) => other != null && this == new TextSegment(other);
 
     /// <summary>
     /// Determines whether this segment is equal to another object.

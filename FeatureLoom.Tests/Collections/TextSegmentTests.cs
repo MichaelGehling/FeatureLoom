@@ -107,6 +107,65 @@ public class TextSegmentTests
         Assert.False(seg.TryFindIndex(search, 6, out _));
     }
 
+    [Theory]
+    [InlineData("abc", "", 0)]
+    [InlineData("", "", 0)]
+    [InlineData("abc", "c", 0)]
+    [InlineData("abc", "bc", 0)]
+    [InlineData("abc", "abcd", 0)]
+    [InlineData("abcabc", "abc", 1)]
+    [InlineData("abc", "", 3)]
+    [InlineData("abc", "c", 3)]
+    public void TryFindIndex_TextSegment_MatchesStringIndexOf(string text, string search, int firstIndex)
+    {
+        int expected = text.IndexOf(search, firstIndex, StringComparison.Ordinal);
+        var seg = new TextSegment("xx" + text + "yy", 2, text.Length);
+
+        Assert.Equal(expected >= 0, seg.TryFindIndex(new TextSegment(search), firstIndex, out int index));
+        Assert.Equal(expected, index);
+        if (firstIndex == 0)
+        {
+            Assert.Equal(expected >= 0, seg.TryFindIndex(new TextSegment(search), out index));
+            Assert.Equal(expected, index);
+        }
+    }
+
+    [Theory]
+    [InlineData("abc", 'c', 0)]
+    [InlineData("abc", 'z', 0)]
+    [InlineData("", 'a', 0)]
+    [InlineData("abcabc", 'a', 1)]
+    [InlineData("abc", 'c', 3)]
+    public void TryFindIndex_Char_MatchesStringIndexOf(string text, char c, int firstIndex)
+    {
+        int expected = text.IndexOf(c, firstIndex);
+        var seg = new TextSegment("xx" + text + "yy", 2, text.Length);
+
+        Assert.Equal(expected >= 0, seg.TryFindIndex(c, firstIndex, out int index));
+        Assert.Equal(expected, index);
+        if (firstIndex == 0)
+        {
+            Assert.Equal(expected >= 0, seg.TryFindIndex(c, out index));
+            Assert.Equal(expected, index);
+        }
+    }
+
+    [Fact]
+    public void TryFindIndex_Char_ThrowsOnOutOfRangeFirstIndex()
+    {
+        var seg = new TextSegment("xxabcyy", 2, 3);
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindIndex('a', -1, out _));
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindIndex('a', 4, out _));
+    }
+
+    [Fact]
+    public void TryFindIndex_TextSegment_ThrowsOnOutOfRangeFirstIndex()
+    {
+        var seg = new TextSegment("xxabcyy", 2, 3);
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindIndex(new TextSegment("a"), -1, out _));
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindIndex(new TextSegment("a"), 4, out _));
+    }
+
     [Fact]
     public void TryFindIndex_Char_WithStartIndex_Works()
     {
@@ -609,5 +668,171 @@ public class TextSegmentTests
         {
             StringInternCache.Shared = previous;
         }
+    }
+
+    [Theory]
+    [InlineData("Objects/Machine/", "/", true)]
+    [InlineData("a/b/*", "/*", true)]
+    [InlineData("abab", "ab", true)]
+    [InlineData("abc", "abc", true)]
+    [InlineData("abc", "", true)]
+    [InlineData("ab", "abc", false)]
+    [InlineData("a/b", "/", false)]
+    public void EndsWith_ChecksOnlyTheSuffix(string text, string suffix, bool expected)
+    {
+        Assert.Equal(text.EndsWith(suffix, StringComparison.Ordinal), expected);
+        Assert.Equal(expected, new TextSegment(text).EndsWith(new TextSegment(suffix)));
+        // Also on a subsegment, so the offset into the underlying string is honored.
+        Assert.Equal(expected, new TextSegment("xx" + text + "yy", 2, text.Length).EndsWith(new TextSegment(suffix)));
+    }
+
+    [Theory]
+    [InlineData("/Objects/Machine", "/", true)]
+    [InlineData("abab", "ab", true)]
+    [InlineData("abc", "", true)]
+    [InlineData("xab", "ab", false)]
+    [InlineData("ab", "abc", false)]
+    public void StartsWith_ChecksOnlyThePrefix(string text, string prefix, bool expected)
+    {
+        Assert.Equal(text.StartsWith(prefix, StringComparison.Ordinal), expected);
+        Assert.Equal(expected, new TextSegment(text).StartsWith(new TextSegment(prefix)));
+        Assert.Equal(expected, new TextSegment("xx" + text + "yy", 2, text.Length).StartsWith(new TextSegment(prefix)));
+    }
+
+    [Fact]
+    public void SubSegment_StartIndexOnly_StaysWithinSegment()
+    {
+        var seg = new TextSegment("xxabcdefyy", 2, 6); // "abcdef"
+        Assert.Equal("cdef", seg.SubSegment(2).ToString());
+        Assert.Equal("", seg.SubSegment(6).ToString());
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.SubSegment(7));
+    }
+
+    [Fact]
+    public void Split_OnSubSegment_DoesNotExceedSegment()
+    {
+        var seg = new TextSegment("a,b|c,d", 0, 3); // "a,b"
+        var parts = seg.Split(',').Select(s => s.ToString()).ToArray();
+        Assert.Equal(new[] { "a", "b" }, parts);
+    }
+
+    [Fact]
+    public void Split_Reset_RestartsEnumeration()
+    {
+        var enumerator = new TextSegment("a,b").Split(',');
+        Assert.True(enumerator.MoveNext());
+        Assert.True(enumerator.MoveNext());
+        Assert.False(enumerator.MoveNext());
+        enumerator.Reset();
+        Assert.Equal("", enumerator.Current.ToString());
+        Assert.True(enumerator.MoveNext());
+        Assert.Equal("a", enumerator.Current.ToString());
+    }
+
+    [Fact]
+    public void SubSegment_IncludeSearchStrings_SameMarker_FindsNextOccurrence()
+    {
+        var seg = new TextSegment("x'abc'y");
+        var result = seg.SubSegment(0, "'", "'", out int rest, includeSearchStrings: true);
+        Assert.NotNull(result);
+        Assert.Equal("'abc'", result.Value.ToString());
+        Assert.Equal(5, rest);
+    }
+
+    [Fact]
+    public void SubSegment_RestStartIndex_PointsToEndMarker()
+    {
+        var seg = new TextSegment("a=1;b=2;");
+        var result = seg.SubSegment(0, "=", ";", out int rest);
+        Assert.Equal("1", result.Value.ToString());
+        Assert.Equal(3, rest);
+        result = seg.SubSegment(rest, "=", ";", out rest);
+        Assert.Equal("2", result.Value.ToString());
+        Assert.Equal(7, rest);
+    }
+
+    [Fact]
+    public void SubSegment_StringOverloads_Work()
+    {
+        var seg = new TextSegment("key=[value]");
+        Assert.Equal("value", seg.SubSegment("[", "]"));
+        Assert.Equal("[value]", seg.SubSegment("[", "]", true));
+        Assert.Equal("value]", seg.SubSegment("["));
+        Assert.Null(seg.SubSegment("{", "}"));
+    }
+
+    [Fact]
+    public void TryExtract_Works()
+    {
+        var seg = new TextSegment("x=42;y=3.5;");
+        Assert.True(seg.TryExtract("x=", ";", out int x));
+        Assert.Equal(42, x);
+        Assert.True(seg.TryExtract("y=", ";", out double y, out int rest));
+        Assert.Equal(3.5, y);
+        Assert.Equal(10, rest);
+        Assert.True(seg.TryExtract(5, "=", ";", out double y2));
+        Assert.Equal(3.5, y2);
+        Assert.False(seg.TryExtract("x=", ";", out DateTime _));
+        Assert.False(seg.TryExtract("z=", ";", out int _));
+    }
+
+    [Fact]
+    public void Contains_TextSegment_Works()
+    {
+        var seg = new TextSegment("xxhelloyy", 2, 5);
+        Assert.True(seg.Contains(new TextSegment("ell")));
+        Assert.False(seg.Contains(new TextSegment("yy")));
+        Assert.True(seg.Contains(TextSegment.Empty));
+        Assert.True(TextSegment.Empty.Contains(TextSegment.Empty));
+    }
+
+    [Fact]
+    public void Equals_NullString_ReturnsFalse()
+    {
+        var seg = new TextSegment("abc");
+        Assert.False(seg.Equals((string)null));
+        Assert.False(seg.Equals((object)null));
+    }
+
+    [Fact]
+    public void Equality_IsIndependentOfUnderlyingString()
+    {
+        var a = new TextSegment("xxabc", 2, 3);
+        var b = new TextSegment("abcyy", 0, 3);
+        Assert.True(a == b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+        Assert.True(a.Equals((object)"abc"));
+        Assert.False(a == new TextSegment("abd"));
+    }
+
+    [Fact]
+    public void Enumerator_YieldsOnlySegmentChars()
+    {
+        var seg = new TextSegment("xxabcyy", 2, 3);
+        Assert.Equal("abc", new string(seg.ToArray()));
+        Assert.Equal(3, seg.Count);
+        Assert.Equal(3, seg.Length);
+        Assert.Equal(2, seg.Offset);
+        Assert.Equal("xxabcyy", seg.UnderlyingString);
+    }
+
+    [Fact]
+    public void Default_IsInvalid()
+    {
+        TextSegment seg = default;
+        Assert.False(seg.IsValid);
+        Assert.True(seg.IsEmptyOrInvalid);
+        Assert.Equal("", seg.ToString());
+    }
+
+    [Fact]
+    public void Trim_OnSubSegment_RespectsBounds()
+    {
+        var seg = new TextSegment("  a  |  b  ", 0, 5); // "  a  "
+        Assert.Equal("a", seg.Trim().ToString());
+        Assert.Equal("a  ", seg.TrimStart().ToString());
+        Assert.Equal("  a", seg.TrimEnd().ToString());
+        Assert.Equal("", new TextSegment("   ").Trim().ToString());
+        Assert.Equal("abc", new TextSegment("abc").Trim(new char[0]).ToString());
     }
 }
