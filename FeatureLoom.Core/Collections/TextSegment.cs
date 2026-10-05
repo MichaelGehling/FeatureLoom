@@ -295,11 +295,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// <returns>True if the segment contains the specified character; otherwise, false.</returns>
     public bool Contains(char c)
     {
-        for (int i = 0; i < length; i++)
-        {
-            if (this[i] == c) return true;
-        }
-        return false;
+        if (length == 0) return false;
+        return text.IndexOf(c, startIndex, length) >= 0;
     }
 
     /// <summary>
@@ -339,22 +336,31 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
             return true;
         }
 
-        int lastStart = length - other.length;
-        for (index = firstIndex; index <= lastStart; index++)
+#if !NETSTANDARD2_0
+        index = AsSpan().Slice(firstIndex).IndexOf(other.AsSpan());
+        if (index < 0) return false;
+        index += firstIndex;
+        return true;
+#else
+        // Scan for the first char natively, then verify the rest with an ordinal compare.
+        int otherLength = other.length;
+        int lastStart = startIndex + length - otherLength;
+        char first = other.text[other.startIndex];
+        int pos = startIndex + firstIndex;
+        while (pos <= lastStart)
         {
-            bool found = true;
-            for (int j = 0; j < other.length; j++)
+            pos = text.IndexOf(first, pos, lastStart - pos + 1);
+            if (pos < 0) break;
+            if (string.CompareOrdinal(text, pos + 1, other.text, other.startIndex + 1, otherLength - 1) == 0)
             {
-                if (this[index + j] != other[j])
-                {
-                    found = false;
-                    break;
-                }
+                index = pos - startIndex;
+                return true;
             }
-            if (found) return true;
+            pos++;
         }
         index = -1;
         return false;
+#endif
     }
 
     /// <summary>
@@ -366,12 +372,15 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryFindIndex(char c, out int index)
     {
-        for (index = 0; index < length; index++)
+        if (length == 0)
         {
-            if (this[index] == c) return true;
+            index = -1;
+            return false;
         }
-        index = -1;
-        return false;
+        index = text.IndexOf(c, startIndex, length);
+        if (index < 0) return false;
+        index -= startIndex;
+        return true;
     }
 
     /// <summary>
@@ -388,12 +397,16 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     {
         if ((uint)firstIndex > (uint)length) throw new ArgumentOutOfRangeException(nameof(firstIndex));
 
-        for (index = firstIndex; index < length; index++)
+        int count = length - firstIndex;
+        if (count == 0)
         {
-            if (this[index] == c) return true;
+            index = -1;
+            return false;
         }
-        index = -1;
-        return false;
+        index = text.IndexOf(c, startIndex + firstIndex, count);
+        if (index < 0) return false;
+        index -= startIndex;
+        return true;
     }
 
     /// <summary>
@@ -436,21 +449,33 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
             return true;
         }
 
-        for (index = lastIndex - other.length + 1; index >= 0; index--)
+        if (other.length > lastIndex + 1)
         {
-            bool found = true;
-            for (int j = 0; j < other.length; j++)
+            index = -1;
+            return false;
+        }
+#if !NETSTANDARD2_0
+        index = AsSpan().Slice(0, lastIndex + 1).LastIndexOf(other.AsSpan());
+        return index >= 0;
+#else
+        // Scan backward for the first char natively, then verify the rest with an ordinal compare.
+        int otherLength = other.length;
+        char first = other.text[other.startIndex];
+        int pos = startIndex + lastIndex - otherLength + 1;
+        while (pos >= startIndex)
+        {
+            pos = text.LastIndexOf(first, pos, pos - startIndex + 1);
+            if (pos < 0) break;
+            if (string.CompareOrdinal(text, pos + 1, other.text, other.startIndex + 1, otherLength - 1) == 0)
             {
-                if (this[index + j] != other[j])
-                {
-                    found = false;
-                    break;
-                }
+                index = pos - startIndex;
+                return true;
             }
-            if (found) return true;
+            pos--;
         }
         index = -1;
         return false;
+#endif
     }
 
     /// <summary>
@@ -462,12 +487,15 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryFindLastIndex(char c, out int index)
     {
-        for (index = length - 1; index >= 0; index--)
+        if (length == 0)
         {
-            if (this[index] == c) return true;
+            index = -1;
+            return false;
         }
-        index = -1;
-        return false;
+        index = text.LastIndexOf(c, startIndex + length - 1, length);
+        if (index < 0) return false;
+        index -= startIndex;
+        return true;
     }
 
     /// <summary>
@@ -486,12 +514,15 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     {
         if (lastIndex < -1 || lastIndex >= length) throw new ArgumentOutOfRangeException(nameof(lastIndex));
 
-        for (index = lastIndex; index >= 0; index--)
+        if (lastIndex < 0)
         {
-            if (this[index] == c) return true;
+            index = -1;
+            return false;
         }
-        index = -1;
-        return false;
+        index = text.LastIndexOf(c, startIndex + lastIndex, lastIndex + 1);
+        if (index < 0) return false;
+        index -= startIndex;
+        return true;
     }
 
     /// <summary>
@@ -604,13 +635,13 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         int newEnd = startIndex + length - 1;
 
         // Trim start
-        while (newStart <= newEnd && trimChars.Contains(text[newStart]))
+        while (newStart <= newEnd && IsTrimChar(trimChars, text[newStart]))
         {
             newStart++;
         }
 
         // Trim end
-        while (newEnd >= newStart && trimChars.Contains(text[newEnd]))
+        while (newEnd >= newStart && IsTrimChar(trimChars, text[newEnd]))
         {
             newEnd--;
         }
@@ -744,7 +775,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         int newEnd = startIndex + length - 1;
 
         // Trim start
-        while (newStart <= newEnd && trimChars.Contains(text[newStart]))
+        while (newStart <= newEnd && IsTrimChar(trimChars, text[newStart]))
         {
             newStart++;
         }
@@ -766,7 +797,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         int newEnd = startIndex + length - 1;
 
         // Trim end
-        while (newEnd >= newStart && trimChars.Contains(text[newEnd]))
+        while (newEnd >= newStart && IsTrimChar(trimChars, text[newEnd]))
         {
             newEnd--;
         }
@@ -775,6 +806,16 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         if (newLength <= 0) return Empty;
 
         return new TextSegment(text, newStart, newLength);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsTrimChar(char[] trimChars, char c)
+    {
+        for (int i = 0; i < trimChars.Length; i++)
+        {
+            if (trimChars[i] == c) return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -836,11 +877,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     {
         if (segment.length == 0) return true; // Same as string.StartsWith/EndsWith("").
         if (segment.length > length) return false;
-        for (int i = 0; i < segment.length; i++)
-        {
-            if (this[i] != segment[i]) return false;
-        }
-        return true;
+        return string.CompareOrdinal(text, startIndex, segment.text, segment.startIndex, segment.length) == 0;
     }
 
     /// <summary>
@@ -852,12 +889,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     {
         if (segment.length == 0) return true; // Same as string.StartsWith/EndsWith("").
         if (segment.length > length) return false;
-        int offset = length - segment.length;
-        for (int i = 0; i < segment.length; i++)
-        {
-            if (this[offset + i] != segment[i]) return false;
-        }
-        return true;
+        return string.CompareOrdinal(text, startIndex + length - segment.length, segment.text, segment.startIndex, segment.length) == 0;
     }
 
     /// <summary>
@@ -1014,11 +1046,12 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         // Only use cached hash codes as a shortcut; computing them here would cost more than a direct comparison.
         if (left.hashCode.HasValue && right.hashCode.HasValue && left.hashCode.Value != right.hashCode.Value) return false;
 
-        for (int i = 0; i < left.length; i++)
-        {
-            if (left[i] != right[i]) return false;
-        }
-        return true;
+        if (left.length == 0) return true;
+#if !NETSTANDARD2_0
+        return left.AsSpan().SequenceEqual(right.AsSpan());
+#else
+        return string.CompareOrdinal(left.text, left.startIndex, right.text, right.startIndex, left.length) == 0;
+#endif
     }
 
     /// <summary>
@@ -1071,18 +1104,16 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         int hash1 = 5381;
         int hash2 = 5381;
 
-        for (int i = 0; i < length; i++)
+        // Even indexed characters go to hash1, odd indexed ones to hash2 (processed pairwise to avoid branching).
+        string s = text;
+        int pos = startIndex;
+        int pairEnd = startIndex + (length & ~1);
+        for (; pos < pairEnd; pos += 2)
         {
-            // Processing odd indexed characters with hash1 and even indexed characters with hash2.
-            if (i % 2 == 0)
-            {
-                hash1 = ((hash1 << 5) + hash1) ^ this[i];
-            }
-            else
-            {
-                hash2 = ((hash2 << 5) + hash2) ^ this[i];
-            }
+            hash1 = ((hash1 << 5) + hash1) ^ s[pos];
+            hash2 = ((hash2 << 5) + hash2) ^ s[pos + 1];
         }
+        if ((length & 1) != 0) hash1 = ((hash1 << 5) + hash1) ^ s[pos];
 
         // Combining the hash values.
         return hash1 + (hash2 * 1566083941);
