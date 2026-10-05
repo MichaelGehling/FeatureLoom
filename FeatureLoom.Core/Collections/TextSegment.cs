@@ -400,18 +400,43 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     /// Tries to find the index of the last occurrence of another <see cref="TextSegment"/> within this segment.
     /// </summary>
     /// <param name="other">The segment to search for.</param>
-    /// <param name="index">The index of the last occurrence, if found.</param>
+    /// <param name="index">The index of the last occurrence, if found; otherwise -1.</param>
     /// <returns>True if found; otherwise, false.</returns>
+    /// <remarks>
+    /// Same semantics as <see cref="string.LastIndexOf(string, StringComparison)"/> with ordinal comparison on .NET 5+:
+    /// an empty <paramref name="other"/> is always found at <see cref="Length"/>.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryFindLastIndex(TextSegment other, out int index)
+    public bool TryFindLastIndex(TextSegment other, out int index) => TryFindLastIndex(other, length - 1, out index);
+
+    /// <summary>
+    /// Tries to find the index of the last occurrence of another <see cref="TextSegment"/> within this segment,
+    /// searching backward from <paramref name="lastIndex"/>. The entire <paramref name="other"/> segment
+    /// must fit within the range [0, lastIndex].
+    /// </summary>
+    /// <param name="other">The segment to search for.</param>
+    /// <param name="lastIndex">
+    /// The index (relative to this segment) to start searching backward from. The last character of <paramref name="other"/>
+    /// must be at or before this index. Must be in the range [-1, <see cref="Length"/> - 1]; -1 denotes an empty search range.
+    /// </param>
+    /// <param name="index">The index of the last occurrence, if found; otherwise -1.</param>
+    /// <returns>True if found; otherwise, false.</returns>
+    /// <remarks>
+    /// An empty <paramref name="other"/> is always found at <paramref name="lastIndex"/> + 1 (the end of the search range).
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="lastIndex"/> is less than -1 or not less than <see cref="Length"/>.</exception>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryFindLastIndex(TextSegment other, int lastIndex, out int index)
     {
-        if (other.length == 0 || other.length > length)
+        if (lastIndex < -1 || lastIndex >= length) throw new ArgumentOutOfRangeException(nameof(lastIndex));
+
+        if (other.length == 0)
         {
-            index = -1;
-            return false;
+            index = lastIndex + 1;
+            return true;
         }
 
-        for (index = length - other.length; index >= 0; index--)
+        for (index = lastIndex - other.length + 1; index >= 0; index--)
         {
             bool found = true;
             for (int j = 0; j < other.length; j++)
@@ -429,39 +454,10 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     }
 
     /// <summary>
-    /// Tries to find the index of the last occurrence of another <see cref="TextSegment"/> within this segment,
-    /// searching backward from <paramref name="lastIndex"/>. The entire <paramref name="other"/> segment
-    /// must fit within the range [0, lastIndex].
-    /// </summary>
-    /// <param name="other">The segment to search for.</param>
-    /// <param name="lastIndex">The index to start searching backward from. The last character of <paramref name="other"/> must be at or before this index.</param>
-    /// <param name="index">The index of the last occurrence, if found.</param>
-    /// <returns>True if found; otherwise, false.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryFindLastIndex(TextSegment other, int lastIndex, out int index)
-    {
-        if (other.length == 0 || other.length > length)
-        {
-            index = -1;
-            return false;
-        }
-
-        int maxStart = Math.Min(lastIndex - other.length + 1, length - other.length);
-        if (maxStart < 0)
-        {
-            index = -1;
-            return false;
-        }
-
-        var searchSegment = SubSegment(0, maxStart + other.length);
-        return searchSegment.TryFindLastIndex(other, out index);
-    }
-
-    /// <summary>
     /// Tries to find the index of the last occurrence of a character within this segment.
     /// </summary>
     /// <param name="c">The character to search for.</param>
-    /// <param name="index">The index of the last occurrence, if found.</param>
+    /// <param name="index">The index of the last occurrence, if found; otherwise -1.</param>
     /// <returns>True if found; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryFindLastIndex(char c, out int index)
@@ -475,17 +471,22 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     }
 
     /// <summary>
-    /// Tries to find the index of the last occurrence of a character within this segment, searching backward from a given index.
+    /// Tries to find the index of the last occurrence of a character within this segment, searching backward from <paramref name="lastIndex"/>.
     /// </summary>
     /// <param name="c">The character to search for.</param>
-    /// <param name="lastIndex">The index to start searching backward from.</param>
-    /// <param name="index">The index of the last occurrence, if found.</param>
+    /// <param name="lastIndex">
+    /// The index (relative to this segment) to start searching backward from.
+    /// Must be in the range [-1, <see cref="Length"/> - 1]; -1 denotes an empty search range.
+    /// </param>
+    /// <param name="index">The index of the last occurrence, if found; otherwise -1.</param>
     /// <returns>True if found; otherwise, false.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="lastIndex"/> is less than -1 or not less than <see cref="Length"/>.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryFindLastIndex(char c, int lastIndex, out int index)
     {
-        int start = Math.Min(lastIndex, length - 1);
-        for (index = start; index >= 0; index--)
+        if (lastIndex < -1 || lastIndex >= length) throw new ArgumentOutOfRangeException(nameof(lastIndex));
+
+        for (index = lastIndex; index >= 0; index--)
         {
             if (this[index] == c) return true;
         }

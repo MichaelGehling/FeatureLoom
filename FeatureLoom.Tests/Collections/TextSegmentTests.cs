@@ -158,6 +158,56 @@ public class TextSegmentTests
         Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindIndex('a', 4, out _));
     }
 
+    [Theory]
+    [InlineData("abcabc", "abc", 5, 3)]
+    [InlineData("abcabc", "abc", 4, 0)]
+    [InlineData("abcabc", "abc", 1, -1)]
+    [InlineData("abc", "abcd", 2, -1)]
+    [InlineData("abc", "", 2, 3)]
+    [InlineData("abc", "", 0, 1)]
+    [InlineData("abc", "", -1, 0)]
+    [InlineData("", "", -1, 0)]
+    [InlineData("", "a", -1, -1)]
+    public void TryFindLastIndex_TextSegment_WithLastIndex_EdgeCases(string text, string search, int lastIndex, int expected)
+    {
+        var seg = new TextSegment("xx" + text + "yy", 2, text.Length);
+        Assert.Equal(expected >= 0, seg.TryFindLastIndex(new TextSegment(search), lastIndex, out int index));
+        Assert.Equal(expected, index);
+        if (lastIndex == text.Length - 1)
+        {
+            Assert.Equal(expected >= 0, seg.TryFindLastIndex(new TextSegment(search), out index));
+            Assert.Equal(expected, index);
+        }
+    }
+
+    [Theory]
+    [InlineData("abacad", 'a', 5, 4)]
+    [InlineData("abacad", 'a', 3, 2)]
+    [InlineData("abacad", 'z', 5, -1)]
+    [InlineData("abc", 'a', -1, -1)]
+    [InlineData("", 'a', -1, -1)]
+    public void TryFindLastIndex_Char_WithLastIndex_EdgeCases(string text, char c, int lastIndex, int expected)
+    {
+        var seg = new TextSegment("xx" + text + "yy", 2, text.Length);
+        Assert.Equal(expected >= 0, seg.TryFindLastIndex(c, lastIndex, out int index));
+        Assert.Equal(expected, index);
+        if (lastIndex == text.Length - 1)
+        {
+            Assert.Equal(expected >= 0, seg.TryFindLastIndex(c, out index));
+            Assert.Equal(expected, index);
+        }
+    }
+
+    [Fact]
+    public void TryFindLastIndex_ThrowsOnOutOfRangeLastIndex()
+    {
+        var seg = new TextSegment("xxabcyy", 2, 3);
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindLastIndex(new TextSegment("a"), -2, out _));
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindLastIndex(new TextSegment("a"), 3, out _));
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindLastIndex('a', -2, out _));
+        Assert.Throws<ArgumentOutOfRangeException>(() => seg.TryFindLastIndex('a', 3, out _));
+    }
+
     [Fact]
     public void TryFindIndex_TextSegment_ThrowsOnOutOfRangeFirstIndex()
     {
