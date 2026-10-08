@@ -717,6 +717,9 @@ public sealed partial class JsonDeserializer
         /// <summary>Member-level alternate name override.</summary>
         internal string member_overrideName = null;
 
+        /// <summary>Rule that derives the expected JSON names of this type's members, or <see langword="null"/>.</summary>
+        internal Func<string, string> memberNameTransform = null;
+
         /// <summary>
         /// String-cache usage override. On a string member/element it applies to that value; on any
         /// other type scope it applies to the string members/elements read directly by that type.
@@ -815,7 +818,21 @@ public sealed partial class JsonDeserializer
         /// </remarks>
         /// <param name="useStringCache"><see langword="true"/> to use string caching for this scope.</param>
         public void SetUseStringCache(bool useStringCache) => member_useStringCache = useStringCache;
+
+        /// <summary>
+        /// Derives the expected JSON names of all members of this type scope from a single rule,
+        /// e.g. <c>name =&gt; name.Replace('/', '_')</c>.
         /// </summary>
+        /// <remarks>
+        /// The rule receives the member name (property name for auto-property backing fields).
+        /// An explicit <c>OverrideName</c> on a member wins over the rule. Like <c>OverrideName</c>,
+        /// only the transformed name is accepted. It applies to the members of this type only; use
+        /// <see cref="RecursiveReadSettings.OverrideMemberNames"/> for a whole subtree.
+        /// </remarks>
+        /// <param name="nameTransform">Maps a member name to the JSON field name, or <see langword="null"/> to remove the rule.</param>
+        public void OverrideMemberNames(Func<string, string> nameTransform) => memberNameTransform = nameTransform;
+
+        /// <summary>Configures policies inherited by this scope and all nested values.</summary>
         public void ConfigureRecursively(Action<RecursiveReadSettings> configure)
         {
             if (configure == null)
@@ -837,6 +854,7 @@ public sealed partial class JsonDeserializer
                 multiOptionMappedTypes = multiOptionMappedTypes.Count > 0 ? multiOptionMappedTypes : broaderSettings.multiOptionMappedTypes,
                 member_ignore = member_ignore,
                 member_overrideName = member_overrideName,
+                memberNameTransform = memberNameTransform ?? broaderSettings.memberNameTransform,
                 member_useStringCache = member_useStringCache ?? broaderSettings.member_useStringCache,
                 dataAccess = dataAccess ?? broaderSettings.dataAccess,
                 backingFieldMode = backingFieldMode ?? broaderSettings.backingFieldMode,
@@ -877,6 +895,7 @@ public sealed partial class JsonDeserializer
                 multiOptionMappedTypes = multiOptionMappedTypes,
                 member_ignore = member_ignore,
                 member_overrideName = member_overrideName,
+                memberNameTransform = memberNameTransform,
                 member_useStringCache = member_useStringCache,
                 dataAccess = dataAccess,
                 backingFieldMode = backingFieldMode,
@@ -1012,6 +1031,13 @@ public sealed partial class JsonDeserializer
         internal bool? castObjectArrayToCommonTypeArray;
         internal bool? useStringCache;
         internal UnknownFieldPolicy? unknownFieldPolicy;
+        internal Func<string, string> memberNameTransform;
+
+        /// <summary>
+        /// Derives the expected member names of every object in this subtree from a single rule.
+        /// Type-level rules and explicit member names override it.
+        /// </summary>
+        public void OverrideMemberNames(Func<string, string> nameTransform) => memberNameTransform = nameTransform;
 
         public void SetDataAccess(DataAccess value) => dataAccess = value;
         public void SetBackingFieldMode(BackingFieldMode value) => backingFieldMode = value;
@@ -1034,7 +1060,8 @@ public sealed partial class JsonDeserializer
                 populateAsMember = populateAsMember ?? outer.populateAsMember,
                 castObjectArrayToCommonTypeArray = castObjectArrayToCommonTypeArray ?? outer.castObjectArrayToCommonTypeArray,
                 useStringCache = useStringCache ?? outer.useStringCache,
-                unknownFieldPolicy = unknownFieldPolicy ?? outer.unknownFieldPolicy
+                unknownFieldPolicy = unknownFieldPolicy ?? outer.unknownFieldPolicy,
+                memberNameTransform = memberNameTransform ?? outer.memberNameTransform
             };
             return merged.HasSameValues(outer) ? outer : merged;
         }
@@ -1048,7 +1075,8 @@ public sealed partial class JsonDeserializer
             populateAsMember == other.populateAsMember &&
             castObjectArrayToCommonTypeArray == other.castObjectArrayToCommonTypeArray &&
             useStringCache == other.useStringCache &&
-            unknownFieldPolicy == other.unknownFieldPolicy;
+            unknownFieldPolicy == other.unknownFieldPolicy &&
+            memberNameTransform == other.memberNameTransform;
 
         internal BaseTypeSettings ApplyBelow(BaseTypeSettings local)
         {
@@ -1058,6 +1086,7 @@ public sealed partial class JsonDeserializer
                 multiOptionMappedTypes = local?.multiOptionMappedTypes ?? default,
                 member_ignore = local?.member_ignore,
                 member_overrideName = local?.member_overrideName,
+                memberNameTransform = local?.memberNameTransform ?? memberNameTransform,
                 member_useStringCache = local?.member_useStringCache ?? useStringCache,
                 dataAccess = local?.dataAccess ?? dataAccess,
                 backingFieldMode = local?.backingFieldMode ?? backingFieldMode,

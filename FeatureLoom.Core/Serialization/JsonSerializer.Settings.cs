@@ -326,6 +326,9 @@ namespace FeatureLoom.Serialization
             /// <summary>Member-level alternate name override.</summary>
             internal string member_overrideName = null;
 
+            /// <summary>Rule that derives the written names of this type's members, or <see langword="null"/>.</summary>
+            internal Func<string, string> memberNameTransform = null;
+
             /// <summary>Per-member configuration map, keyed by member name.</summary>
             internal Dictionary<string, BaseTypeWriteSettings> memberSettingsDict = new();
 
@@ -399,7 +402,20 @@ namespace FeatureLoom.Serialization
                 recursiveSettings != null ||
                 dictionaryShape != null ||
                 keyFormatter != null ||
+                memberNameTransform != null ||
                 memberSettingsDict.Count > 0;
+
+            /// <summary>
+            /// Derives the written names of all members of this type scope from a single rule,
+            /// e.g. <c>name =&gt; name.Replace('_', '/')</c>.
+            /// </summary>
+            /// <remarks>
+            /// The rule receives the name that would be written otherwise. An explicit
+            /// <c>OverrideName</c> on a member wins over the rule. It applies to the members of this
+            /// type only; use <see cref="RecursiveWriteSettings.OverrideMemberNames"/> for a whole subtree.
+            /// </remarks>
+            /// <param name="nameTransform">Maps a member name to the JSON field name, or <see langword="null"/> to remove the rule.</param>
+            public void OverrideMemberNames(Func<string, string> nameTransform) => memberNameTransform = nameTransform;
 
             /// <summary>
             /// Configures defaults that apply to this type scope and recursively to nested values.
@@ -458,6 +474,7 @@ namespace FeatureLoom.Serialization
                     recursiveSettings = recursiveSettings?.MergeOnto(generalSettings.recursiveSettings) ?? generalSettings.recursiveSettings,
                     member_ignore = member_ignore,
                     member_overrideName = member_overrideName,
+                    memberNameTransform = memberNameTransform ?? generalSettings.memberNameTransform,
                     ownerSettings = ownerSettings ?? generalSettings.ownerSettings,
                     isMerged = true
                 };
@@ -501,6 +518,7 @@ namespace FeatureLoom.Serialization
                     recursiveSettings = recursiveSettings,
                     member_ignore = member_ignore,
                     member_overrideName = member_overrideName,
+                    memberNameTransform = memberNameTransform,
                     ownerSettings = ownerSettings,
                     isMerged = true
                 };
@@ -807,6 +825,13 @@ namespace FeatureLoom.Serialization
             internal bool? writeByteArrayAsBase64String;
             internal bool? treatEnumerablesAsCollections;
             internal DictionaryShape? dictionaryShape;
+            internal Func<string, string> memberNameTransform;
+
+            /// <summary>
+            /// Derives the written member names of every object in this subtree from a single rule.
+            /// Type-level rules and explicit member names override it.
+            /// </summary>
+            public void OverrideMemberNames(Func<string, string> nameTransform) => memberNameTransform = nameTransform;
 
             public void SetDataSelection(DataSelection value) => dataSelection = value;
             public void SetTypeInfoHandling(TypeInfoHandling value) => typeInfoHandling = value;
@@ -830,7 +855,8 @@ namespace FeatureLoom.Serialization
                     enumAsString = enumAsString ?? outer.enumAsString,
                     writeByteArrayAsBase64String = writeByteArrayAsBase64String ?? outer.writeByteArrayAsBase64String,
                     treatEnumerablesAsCollections = treatEnumerablesAsCollections ?? outer.treatEnumerablesAsCollections,
-                    dictionaryShape = dictionaryShape ?? outer.dictionaryShape
+                    dictionaryShape = dictionaryShape ?? outer.dictionaryShape,
+                    memberNameTransform = memberNameTransform ?? outer.memberNameTransform
                 };
                 return merged.HasSameValues(outer) ? outer : merged;
             }
@@ -844,7 +870,8 @@ namespace FeatureLoom.Serialization
                 enumAsString == other.enumAsString &&
                 writeByteArrayAsBase64String == other.writeByteArrayAsBase64String &&
                 treatEnumerablesAsCollections == other.treatEnumerablesAsCollections &&
-                dictionaryShape == other.dictionaryShape;
+                dictionaryShape == other.dictionaryShape &&
+                memberNameTransform == other.memberNameTransform;
 
             internal BaseTypeWriteSettings ApplyBelow(BaseTypeWriteSettings local)
             {
@@ -866,6 +893,7 @@ namespace FeatureLoom.Serialization
                     recursiveSettings = local?.recursiveSettings,
                     member_ignore = local?.member_ignore,
                     member_overrideName = local?.member_overrideName,
+                    memberNameTransform = local?.memberNameTransform ?? memberNameTransform,
                     ownerSettings = local?.ownerSettings,
                     isMerged = local?.isMerged ?? false
                 };

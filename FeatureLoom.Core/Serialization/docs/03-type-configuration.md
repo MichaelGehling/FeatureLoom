@@ -43,6 +43,20 @@ readSettings.ConfigureType<Customer>(t =>
 
 `Customer` has no attributes and does not know about JSON at all.
 
+### Renaming all members by rule
+
+`OverrideMemberNames(Func<string, string>)` renames every member of a type with one rule instead of
+one `OverrideName` per member. It is available for serializer and deserializer, on a type scope
+(direct members only) and inside `ConfigureRecursively` (whole subtree):
+
+```csharp
+writeSettings.ConfigureType<Customer>(t => t.OverrideMemberNames(n => n.Replace('_', '/')));
+readSettings.ConfigureType<Customer>(t => t.ConfigureRecursively(r => r.OverrideMemberNames(n => n.Replace('_', '/'))));
+```
+
+Precedence: member `OverrideName` > type `OverrideMemberNames` > recursive `OverrideMemberNames`.
+When reading, only the transformed name matches.
+
 **System.Text.Json**
 
 ```csharp

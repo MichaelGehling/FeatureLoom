@@ -172,7 +172,7 @@ namespace FeatureLoom.Serialization
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
                 bool withLeadingComma = mergeCommas && fieldValueWriters.Count > 0;
-                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo, withLeadingComma, dataSelection, memberSettings });
+                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo, withLeadingComma, dataSelection, memberSettings, typeSettings?.memberNameTransform });
                 fieldValueWriters.Add(writer);
             }
 
@@ -221,7 +221,7 @@ namespace FeatureLoom.Serialization
                 MethodInfo createMethod = typeof(JsonSerializer).GetMethod(nameof(CreateFieldValueWriter), BindingFlags.NonPublic | BindingFlags.Instance);
                 MethodInfo genericCreateMethod = createMethod.MakeGenericMethod(itemType, fieldType);
                 bool withLeadingComma = mergeCommas && fieldValueWriters.Count > 0;
-                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo, withLeadingComma, dataSelection, memberSettings });
+                Action<T> writer = (Action<T>)genericCreateMethod.Invoke(this, new object[] { fieldTypeHandler, memberInfo, withLeadingComma, dataSelection, memberSettings, typeSettings?.memberNameTransform });
                 fieldValueWriters.Add(writer);
             }
 
@@ -333,7 +333,7 @@ namespace FeatureLoom.Serialization
             return null;
         }
 
-        private Action<T> CreateFieldValueWriter<T, V>(CachedTypeWriter fieldTypeHandler, MemberInfo memberInfo, bool withLeadingComma, DataSelection dataSelection, BaseTypeWriteSettings memberSettings)
+        private Action<T> CreateFieldValueWriter<T, V>(CachedTypeWriter fieldTypeHandler, MemberInfo memberInfo, bool withLeadingComma, DataSelection dataSelection, BaseTypeWriteSettings memberSettings, Func<string, string> nameTransform)
         {
             string fieldName = memberInfo.Name;
             if (dataSelection == DataSelection.PublicAndPrivateFields_CleanBackingFields &&
@@ -342,8 +342,9 @@ namespace FeatureLoom.Serialization
             {
                 fieldName = fieldName.Substring("<", ">");
             }
-            // An explicit name override always wins over the derived member name.
+            // An explicit name override always wins over the derived member name and the type's naming rule.
             if (memberSettings?.member_overrideName != null) fieldName = memberSettings.member_overrideName;
+            else if (nameTransform != null) fieldName = nameTransform(fieldName);
             var fieldNameAndColonBytes = writer.PrepareFieldNameBytes(fieldName);
             if (withLeadingComma)
             {

@@ -129,7 +129,8 @@ Element settings are full `TypeSettings<TElement>`.
 | `SetCustomTypeWriter(…)` | – | ✅ | ✅ (open generic writer type) | ✅ | ✅ | – |
 | `ConfigureMember` / `ConfigureElement` / `ConfigureKey` | – | ✅ | ✅ | ✅ | ✅ | – |
 | `SetIgnore`, `OverrideName` | – | – | – | ✅ | – | – |
-| `referenceCheck`/`referenceFormat`, `typeNameFormat`, `indent…`, buffer sizes | ✅ only | | | | | |
+| `OverrideMemberNames(Func<string,string>)` | – | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `referenceCheck`
 
 `ConfigureKey<TKey>` accepts `Func<TKey, string>`, `Func<TKey, TextSegment>` or (NET 5+)
 `KeyToSpan<TKey>` to format dictionary keys.
@@ -153,7 +154,8 @@ Element settings are full `TypeSettings<TElement>`.
 | `AddInstanceTypeMappingOption` / `…ValueOption`, `AddDefaultStringValueMappings` | – | ✅ | – | ✅ | ✅ | – |
 | `ConfigureMember` / `ConfigureElement` / `ConfigureObjectKey` | – | ✅ | ✅ | ✅ | ✅ | – |
 | `SetIgnore`, `OverrideName` | – | – | – | ✅ | – | – |
-| type names, forbidden/allowed types, whitelist, `strict`, error handling, buffer/cache sizes | ✅ only | | | | | |
+| `OverrideMemberNames(Func<string,string>)` | – | ✅ | ✅ | ✅ | ✅ | ✅ |
+| type names
 
 `ConfigureObjectKey<TKey>(Func<BufferSegment, TKey>)` parses dictionary keys.
 

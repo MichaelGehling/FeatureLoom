@@ -92,7 +92,7 @@ have with Newtonsoft too.
 
 Check these before migrating:
 
-- **Naming strategies** (`CamelCaseNamingStrategy` etc.): no global naming policy. Rename per member with `OverrideName`.
+- **Naming strategies** (`CamelCaseNamingStrategy` etc.): no built-in naming policy. Rename per member with `OverrideName` or by rule with `OverrideMemberNames(Func<string,string>)` (also recursive).
 - **Case-insensitive matching** (Newtonsoft default): not a documented option. Verify with your payloads.
 - **`NullValueHandling.Ignore` / `DefaultValueHandling`**: not a documented option.
 - **Date formats and `DateParseHandling`**: dates use ISO 8601; custom formats need a custom writer/reader.

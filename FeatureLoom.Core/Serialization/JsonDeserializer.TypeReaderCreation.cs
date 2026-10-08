@@ -995,11 +995,20 @@ public sealed partial class JsonDeserializer
                     indicesList[i] = true;
                 }
 
+                string overriddenName = null;
                 if (typeOption.typeSettings != null &&
                     typeOption.typeSettings.memberSettingsDict.TryGetValue(name, out var memberSettings) &&
                     !memberSettings.member_overrideName.EmptyOrNull())
                 {
-                    name = memberSettings.member_overrideName;
+                    overriddenName = memberSettings.member_overrideName;
+                }
+                else if (typeOption.typeSettings?.memberNameTransform != null)
+                {
+                    overriddenName = typeOption.typeSettings.memberNameTransform(name);
+                }
+                if (overriddenName != null)
+                {
+                    name = overriddenName;
                     itemFieldName = new ByteSegment(name.ToByteArray(), true);
                     if (!fieldNameToIsTypeMember.TryGetValue(itemFieldName, out indicesList))
                     {
@@ -1532,6 +1541,13 @@ public sealed partial class JsonDeserializer
                     propertyName = null;
                     backingFieldMode = Settings.BackingFieldMode.TryBackingFieldNameOnly;
                 }
+            }
+            if (typeSettings?.memberNameTransform != null && memberSettings?.member_overrideName == null)
+            {
+                // Same semantics as OverrideName: only the transformed name is accepted.
+                name = typeSettings.memberNameTransform(propertyName ?? name);
+                propertyName = null;
+                backingFieldMode = Settings.BackingFieldMode.TryBackingFieldNameOnly;
             }
 
             // Type-scope string-cache override applies to direct string members without their own override.
