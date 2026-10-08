@@ -351,7 +351,8 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         {
             pos = text.IndexOf(first, pos, lastStart - pos + 1);
             if (pos < 0) break;
-            if (string.CompareOrdinal(text, pos + 1, other.text, other.startIndex + 1, otherLength - 1) == 0)
+            // otherLength == 1 must not reach CompareOrdinal: on .NET Framework it fails for a zero-length compare at the end of the string.
+            if (otherLength == 1 || string.CompareOrdinal(text, pos + 1, other.text, other.startIndex + 1, otherLength - 1) == 0)
             {
                 index = pos - startIndex;
                 return true;
@@ -466,7 +467,7 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
         {
             pos = text.LastIndexOf(first, pos, pos - startIndex + 1);
             if (pos < 0) break;
-            if (string.CompareOrdinal(text, pos + 1, other.text, other.startIndex + 1, otherLength - 1) == 0)
+            if (otherLength == 1 || string.CompareOrdinal(text, pos + 1, other.text, other.startIndex + 1, otherLength - 1) == 0)
             {
                 index = pos - startIndex;
                 return true;

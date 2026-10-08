@@ -827,6 +827,16 @@ public class TextSegmentTests
     }
 
     [Fact]
+    public void TryFindIndex_SingleCharSegment_AtEndOfString_Works()
+    {
+        var seg = new TextSegment("ab;");
+        Assert.True(seg.TryFindIndex(new TextSegment(";"), 0, out int index));
+        Assert.Equal(2, index);
+        Assert.True(seg.TryFindLastIndex(new TextSegment(";"), 2, out index));
+        Assert.Equal(2, index);
+    }
+
+    [Fact]
     public void Contains_TextSegment_Works()
     {
         var seg = new TextSegment("xxhelloyy", 2, 5);
