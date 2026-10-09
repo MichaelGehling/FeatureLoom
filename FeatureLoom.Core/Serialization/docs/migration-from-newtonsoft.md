@@ -21,7 +21,7 @@ A mapping from Newtonsoft concepts to FeatureLoom, ordered by what you hit first
 | `JsonConvert.SerializeObject(obj, settings)` | `serializer.Serialize(obj)` |
 | `JsonConvert.DeserializeObject<T>(json, settings)` | `deserializer.TryDeserialize<T>(json, out var result)` |
 | `JsonConvert.PopulateObject(json, target)` | `deserializer.TryPopulate(json, target)` |
-| `Formatting.Indented` | `indent = true` |
+| `Formatting.Indented` | `formatting = JsonFormatting.Indented` |
 | `JObject` / `JToken` / `dynamic` | `object` → `Dictionary<string, object>` trees, `JsonFragment`, or better: member mapping (page 03) |
 | static `JsonConvert.DefaultSettings` | `JsonHelper.DefaultSerializer` / `DefaultDeserializer` |
 
@@ -32,7 +32,7 @@ string json = JsonConvert.SerializeObject(drawing, settings);
 var copy = JsonConvert.DeserializeObject<Drawing>(json, settings);
 
 // FeatureLoom (type info for deviating types is the default)
-var serializer = new JsonSerializer(new JsonSerializer.Settings { indent = true });
+var serializer = new JsonSerializer(new JsonSerializer.Settings { formatting = JsonSerializer.JsonFormatting.Indented });
 var deserializer = new JsonDeserializer(new JsonDeserializer.Settings());
 string json = serializer.Serialize(drawing);
 deserializer.TryDeserialize(json, out Drawing copy);

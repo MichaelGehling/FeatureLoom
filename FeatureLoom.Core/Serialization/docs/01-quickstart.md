@@ -53,7 +53,7 @@ Settings are passed on construction – either as object or via a callback:
 ```csharp
 var serializer = new JsonSerializer(s =>
 {
-	s.indent = true;
+	s.formatting = JsonSerializer.JsonFormatting.Indented;
 	s.enumAsString = true;
 });
 
@@ -74,7 +74,7 @@ See [02 Settings model](02-settings-model.md) for how settings are compiled and 
 | Proposed types on reading | applied where reasonable, forbidden types always blocked | deserializer `proposedTypeMode`, `typeWhitelistMode` ([06](06-polymorphism.md)) |
 | References | not written / not resolved | serializer `referenceCheck`, deserializer `referenceResolutionMode` ([07](07-references.md)) |
 | Enums | numbers | serializer `enumAsString` |
-| Indentation | off (`JsonHelper.DefaultSerializer`: on) | serializer `indent` |
+| Formatting | `Compact` (`JsonHelper.DefaultSerializer`: `Indented`) | serializer `formatting` (`Compact`, `Indented`, `JsonLines`) |
 | Unknown fields | skipped | deserializer `unknownFieldPolicy` |
 | Numbers in strings | accepted | deserializer `strict = true` |
 | Errors | `TryDeserialize` returns `false`, exception is logged | deserializer `rethrowExceptions`, `logCatchedExceptions` |

@@ -47,7 +47,7 @@ but under heavy concurrent load they become a contention point.
 | `referenceCheck` | `NoRefCheck` | fastest; see [page 07](07-references.md) for the trade-offs of the other modes |
 | `referenceFormat` | `JsonPath` | `IdBased` is faster to write, `JsonPath` produces less output |
 | `typeInfoHandling` | `AddDeviatingTypeInfo` | `AddAllTypeInfo` adds output size and work |
-| `indent` | `false` | indentation costs size and time; keep it for diagnostics |
+| `formatting` | `Compact` | `Indented` costs size and time; keep it for diagnostics. `JsonLines` adds only one byte per root value |
 | `writeBufferChunkSize` | 64 KB | chunk size when writing to streams; `SerializeAsync` uses two buffers of this size, see below |
 | `tempBufferSize` | 8 KB | scratch buffer for number/string formatting |
 

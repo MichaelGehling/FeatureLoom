@@ -68,7 +68,7 @@ options of its type. Details and examples: [03 Type configuration](03-type-confi
 | `typeInfoHandling` / `typeInfoFormat` / `typeNameFormat` | `AddDeviatingTypeInfo` / `InlineForObjects` / `Simplified` | [06](06-polymorphism.md) |
 | `referenceCheck` / `referenceFormat` | `NoRefCheck` / `JsonPath` | [07](07-references.md) |
 | `enumAsString` | `false` | – |
-| `indent`, `indentationFactor`, `maxIndentationDepth` | `false`, `2`, `50` | – |
+| `formatting`, `indentationFactor`, `maxIndentationDepth` | `Compact`, `2`, `50` | – |
 | `writeByteArrayAsBase64String` | `true` | – |
 | `treatEnumerablesAsCollections` | `true` | – |
 | `writeBufferChunkSize`, `tempBufferSize` | 64 KB, 8 KB | [08](08-performance.md) |
@@ -84,6 +84,7 @@ options of its type. Details and examples: [03 Type configuration](03-type-confi
 | `unknownFieldPolicy` | `Skip` | – |
 | `strict` | `false` (e.g. accepts numbers in strings) | – |
 | `rethrowExceptions`, `logCatchedExceptions` | `false`, `true` | – |
+| `inputFormat` | `Json` | `JsonLines`: on failure, skip the rest of the faulty line ([page 09](09-continuous-deserialization.md)) |
 | `populateExistingMembers` | `true` | – |
 | `allowUninitializedObjectCreation` | `false` | – |
 | `castObjectArrayToCommonTypeArray` | `true` | – |

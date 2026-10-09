@@ -44,6 +44,23 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
+        public void Deserialize_BrokenLineLongerThanBuffer_IsSkipped()
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"id\":1}\n{\"id\":2,\"values\":[");
+            for (int i = 0; i < 20000; i++) sb.Append(i).Append(',');
+            sb.Append("broken]}\n{\"id\":3}\n");
+
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString()));
+            var deserializer = CreateJsonLinesDeserializer(1024);
+            deserializer.SetDataSource(stream);
+            var records = ReadAll(deserializer, out int failures);
+
+            Assert.Equal(new[] { 1, 3 }, records.ConvertAll(r => r.id));
+            Assert.Equal(1, failures);
+        }
+
+        [Fact]
         public void Serialize_String_AppendsLineFeed()
         {
             var serializer = CreateJsonLinesSerializer();

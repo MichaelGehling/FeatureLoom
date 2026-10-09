@@ -118,7 +118,7 @@ delimiter itself is the start of the next value (e.g. `"{"`).
 |---|---|---|---|
 | Multiple top-level values from one source | ✅ `IsAnyDataLeft` + `TryDeserialize` loop | ⚠ STJ 9+: `JsonReaderOptions.AllowMultipleValues` (low-level reader) or `DeserializeAsyncEnumerable<T>(stream, topLevelValues: true)`; before 9 only top-level arrays | ✅ `JsonTextReader.SupportMultipleContent` |
 | NDJSON | ✅ out of the box | ⚠ STJ 9+ via `topLevelValues: true`; older versions need manual line splitting | ✅ with `SupportMultipleContent` |
-| Resync after a broken record | ✅ `SkipBufferUntil(delimiter)` | ❌ reader state is invalid after an error | ❌ reader state is invalid after an error |
+| Resync after a broken record | ✅ automatic with `inputFormat = JsonLines`, or manual via `SkipBufferUntil(delimiter)` | ❌ reader state is invalid after an error | ❌ reader state is invalid after an error |
 | Skip to arbitrary delimiter / prefix | ✅ | ❌ | ❌ |
 | Async streaming | ❌ synchronous reads | ✅ | ⚠ partial |
 
