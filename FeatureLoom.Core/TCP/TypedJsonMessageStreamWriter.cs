@@ -12,7 +12,7 @@ namespace FeatureLoom.TCP
         JsonSerializer serializer = new JsonSerializer(new JsonSerializer.Settings()
         {
             enumAsString = true,
-            indent = true,
+            formatting = JsonSerializer.JsonFormatting.Indented,
         });
         byte[] typeInfo = "TypedJSON".ToByteArray();
 

@@ -15,7 +15,7 @@ public class JsonHelperService
 {
     JsonSerializer serializer = new(new JsonSerializer.Settings()
     {
-        indent = true
+        formatting = JsonSerializer.JsonFormatting.Indented
     });
     JsonDeserializer deserializer = new(settings =>
     {

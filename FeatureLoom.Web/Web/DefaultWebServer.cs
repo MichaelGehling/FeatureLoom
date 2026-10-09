@@ -23,7 +23,7 @@ namespace FeatureLoom.Web
     {
         public static JsonSerializer.Settings DefaultSerializerSettings = new()
         {
-            indent = false,
+            formatting = JsonSerializer.JsonFormatting.Compact,
             referenceCheck = JsonSerializer.ReferenceCheck.NoRefCheck,
             dataSelection = JsonSerializer.DataSelection.PublicAndPrivateFields_CleanBackingFields,
             enumAsString = true,

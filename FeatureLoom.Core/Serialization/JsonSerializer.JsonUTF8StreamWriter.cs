@@ -35,6 +35,7 @@ public sealed partial class JsonSerializer
         private SlicedBuffer<byte> tempSlicedBuffer;
         private CompiledSettings settings;
         private readonly bool indent;
+        private readonly bool jsonLines;
         private int currentIndentionDepth = 0;
         private readonly int maxIndentationDepth;
         private readonly byte[][] indentationLookup;
@@ -100,6 +101,7 @@ public sealed partial class JsonSerializer
             this.settings = settings;
 
             indent = settings.indent;
+            jsonLines = settings.jsonLines;
             maxIndentationDepth = settings.maxIndentationDepth;
             indentationLookup = new byte[maxIndentationDepth+1][];
             InitIndentationLookup();
@@ -339,6 +341,15 @@ public sealed partial class JsonSerializer
         public void WritePreparedBytes(byte[] data)
         {
             WriteToBuffer(data);
+        }
+
+        /// <summary>
+        /// Terminates a root value. Only writes a '\n' in JSON Lines mode.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteRootValueTerminator()
+        {
+            if (jsonLines) WriteToBuffer((byte)'\n');
         }
 
         /// <summary>

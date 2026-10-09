@@ -95,7 +95,7 @@ namespace FeatureLoom.Serialization
 
                 if (item == null)
                 {
-                    return "null";
+                    return settings.jsonLines ? "null\n" : "null";
                 }
 
                 Type itemType = GetItemTypeForSerialization(item);
@@ -113,6 +113,8 @@ namespace FeatureLoom.Serialization
                     lastTypeHandler = typeHandler;
                     lastTypeHandlerType = typeHandler.HandlerType;
                 }
+
+                writer.WriteRootValueTerminator();
 
                 if (memoryStream.Obj.Position == 0)
                 {
@@ -352,6 +354,7 @@ namespace FeatureLoom.Serialization
                 if (item == null)
                 {
                     writer.WriteNullValue();
+                    writer.WriteRootValueTerminator();
                     writer.WriteBufferToStream();
                     return;
                 }
@@ -372,6 +375,7 @@ namespace FeatureLoom.Serialization
                     lastTypeHandlerType = typeHandler.HandlerType;
                 }
 
+                writer.WriteRootValueTerminator();
                 writer.WriteBufferToStream();
             }
             finally
@@ -398,6 +402,7 @@ namespace FeatureLoom.Serialization
                 if (item == null)
                 {
                     writer.WriteNullValue();
+                    writer.WriteRootValueTerminator();
                     await writer.WriteBufferToStreamAsync();
                     return;
                 }
@@ -418,6 +423,7 @@ namespace FeatureLoom.Serialization
                     lastTypeHandlerType = typeHandler.HandlerType;
                 }
 
+                writer.WriteRootValueTerminator();
                 await writer.WriteBufferToStreamAsync();
             }
             finally

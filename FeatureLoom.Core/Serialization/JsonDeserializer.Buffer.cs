@@ -239,7 +239,14 @@ public sealed partial class JsonDeserializer
             return segment.ToString();
         }
 
+        /// <summary>Moves the read position back to the start of the current (failed) value.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RewindToValueStart()
+        {
+            bufferPos = bufferStartPos;
+            bufferReadTillEnd = false;
+        }
+
         public ByteSegment GetRemainingBytes() => new ByteSegment(buffer, bufferPos, bufferFillLevel - bufferPos);
 #if !NETSTANDARD2_0
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -37,8 +37,28 @@ while (deserializer.IsAnyDataLeft())
 ## NDJSON with error recovery
 
 NDJSON (JSON Lines) is simply a sequence of values separated by `\n`, so the loop above already
-reads it. `SkipBufferUntil` adds **resynchronization**: when a line is malformed, jump to the next
-line break and continue instead of aborting the whole stream.
+reads it. Setting `inputFormat = InputFormat.JsonLines` adds automatic **resynchronization**: when
+a line is malformed, `TryDeserialize` returns `false` and the next call continues with the next line
+instead of the failure position.
+
+```csharp
+var deserializer = new JsonDeserializer(new JsonDeserializer.Settings
+{
+	inputFormat = JsonDeserializer.Settings.InputFormat.JsonLines
+});
+deserializer.SetDataSource(stream);
+
+while (deserializer.IsAnyDataLeft())
+{
+	if (deserializer.TryDeserialize(out LogEntry entry)) Process(entry);
+	// else: broken record, already skipped
+}
+```
+
+The matching output is produced with `JsonSerializer.Settings.formatting = JsonFormatting.JsonLines`
+(compact JSON plus one `\n` after every root value, also for string results).
+
+Manual resynchronization is possible with `SkipBufferUntil`, e.g. for other delimiters:
 
 ```csharp
 deserializer.SetDataSource(stream);

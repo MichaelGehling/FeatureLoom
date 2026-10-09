@@ -81,21 +81,20 @@ namespace FeatureLoom.Serialization
             public int tempBufferSize = 8 * 1024;
 
             /// <summary>
-            /// If true, the output is formatted with line breaks and indentation. This produces
-            /// human readable but noticeably larger and slower output.
+            /// Determines the layout of the written JSON, see <see cref="JsonFormatting"/>.
             /// </summary>
-            public bool indent = false;
+            public JsonFormatting formatting = JsonFormatting.Compact;
 
             /// <summary>
             /// Nesting depth up to which indentation grows. Deeper levels reuse the indentation of
             /// this depth, which bounds the size of the precomputed indentation lookup.
-            /// Only relevant if <see cref="indent"/> is set.
+            /// Only relevant for <see cref="JsonFormatting.Indented"/>.
             /// </summary>
             public int maxIndentationDepth = 50;
 
             /// <summary>
             /// Number of space characters added per nesting level.
-            /// Only relevant if <see cref="indent"/> is set.
+            /// Only relevant for <see cref="JsonFormatting.Indented"/>.
             /// </summary>
             public int indentationFactor = 2;
 
@@ -1305,6 +1304,29 @@ namespace FeatureLoom.Serialization
         }
 
         /// <summary>
+        /// Determines the layout of the written JSON.
+        /// </summary>
+        public enum JsonFormatting
+        {
+            /// <summary>
+            /// No whitespace at all. Smallest and fastest output.
+            /// </summary>
+            Compact = 0,
+
+            /// <summary>
+            /// Line breaks and indentation. Human readable, but noticeably larger and slower output.
+            /// </summary>
+            Indented = 1,
+
+            /// <summary>
+            /// JSON Lines (also known as NDJSON): every root value is written compact and
+            /// terminated by a single '\n'. Multiple values written to the same stream form a
+            /// valid JSON Lines document.
+            /// </summary>
+            JsonLines = 2
+        }
+
+        /// <summary>
         /// Determines how references to already serialized objects are represented.
         /// </summary>
         public enum ReferenceFormat
@@ -1573,6 +1595,7 @@ namespace FeatureLoom.Serialization
             public readonly int writeBufferChunkSize;
             public readonly int tempBufferSize;
             public readonly bool indent;
+            public readonly bool jsonLines;
             public readonly int maxIndentationDepth;
             public readonly int indentationFactor;
             public readonly ITypeHandlerCreator[] itemHandlerCreators;
@@ -1619,7 +1642,8 @@ namespace FeatureLoom.Serialization
                 treatEnumerablesAsCollections = settings.treatEnumerablesAsCollections;
                 writeBufferChunkSize = settings.writeBufferChunkSize;
                 tempBufferSize = settings.tempBufferSize;
-                indent = settings.indent;
+                indent = settings.formatting == JsonFormatting.Indented;
+                jsonLines = settings.formatting == JsonFormatting.JsonLines;
                 maxIndentationDepth = settings.maxIndentationDepth;
                 indentationFactor = settings.indentationFactor;
                 itemHandlerCreators = settings.customTypeHandlerCreators.Where(creator => creator != null).ToArray();

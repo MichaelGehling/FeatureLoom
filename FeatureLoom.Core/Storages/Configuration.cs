@@ -25,7 +25,7 @@ namespace FeatureLoom.Storages
 
         public static JsonSerializer serializer = new JsonSerializer(new JsonSerializer.Settings()
         {
-            indent = true,
+            formatting = JsonSerializer.JsonFormatting.Indented,
             enumAsString = true,
             typeInfoHandling = JsonSerializer.TypeInfoHandling.AddNoTypeInfo,
             referenceCheck = JsonSerializer.ReferenceCheck.NoRefCheck,

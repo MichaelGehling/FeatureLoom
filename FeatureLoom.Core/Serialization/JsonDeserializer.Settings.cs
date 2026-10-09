@@ -114,6 +114,13 @@ public sealed partial class JsonDeserializer
         public bool rethrowExceptions = false;
 
         /// <summary>
+        /// Format of the input, see <see cref="InputFormat"/>. With <see cref="InputFormat.JsonLines"/>
+        /// a failed deserialization skips the rest of the faulty line, so the next call continues
+        /// with the next line.
+        /// </summary>
+        public InputFormat inputFormat = InputFormat.Json;
+
+        /// <summary>
         /// If <see langword="true"/>, caught exceptions are logged.
         /// </summary>
         public bool logCatchedExceptions = true;
@@ -507,6 +514,25 @@ public sealed partial class JsonDeserializer
                 configureTypeSettings(typeSettings);
                 typeSettingsDict[genericTypeDefinition] = typeSettings;
             }
+        }
+
+        /// <summary>
+        /// Format of the deserialized input.
+        /// </summary>
+        public enum InputFormat
+        {
+            /// <summary>
+            /// Regular JSON, optionally multiple whitespace separated top-level values.
+            /// On failure, reading continues at the position where the error occurred.
+            /// </summary>
+            Json = 0,
+
+            /// <summary>
+            /// JSON Lines (also known as NDJSON): one top-level value per line. On failure, the
+            /// rest of the faulty line is skipped, so the next deserialization starts with the
+            /// next line.
+            /// </summary>
+            JsonLines = 1
         }
 
         /// <summary>
@@ -1663,6 +1689,7 @@ public sealed partial class JsonDeserializer
 
         /// <summary>Resolved rethrow-exceptions setting.</summary>
         public readonly bool rethrowExceptions;
+        public readonly bool jsonLines;
 
         /// <summary>Resolved log-caught-exceptions setting.</summary>
         public readonly bool logCatchedExceptions;
@@ -1780,6 +1807,7 @@ public sealed partial class JsonDeserializer
             initialBufferSize = settings.initialBufferSize.ClampLow(1024 * 16); // minimum 16KB buffer size to avoid too many resizes for larger JSON inputs
             castObjectArrayToCommonTypeArray = settings.castObjectArrayToCommonTypeArray;
             rethrowExceptions = settings.rethrowExceptions;
+            jsonLines = settings.inputFormat == Settings.InputFormat.JsonLines;
             logCatchedExceptions = settings.logCatchedExceptions;
             strict = settings.strict;
             populateExistingMembers = settings.populateExistingMembers;

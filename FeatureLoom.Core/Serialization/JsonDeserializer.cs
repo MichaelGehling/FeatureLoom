@@ -1,4 +1,4 @@
-﻿using FeatureLoom.Collections;
+using FeatureLoom.Collections;
 using FeatureLoom.Extensions;
 using FeatureLoom.Helpers;
 using FeatureLoom.Logging;
@@ -255,6 +255,7 @@ public sealed partial class JsonDeserializer
         catch (Exception e)
         {
             if (settings.logCatchedExceptions) OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+            if (settings.jsonLines) SkipFailedJsonLineUnlocked();
             Reset();
             if (settings.rethrowExceptions) throw;
             item = default;
@@ -322,6 +323,7 @@ public sealed partial class JsonDeserializer
             catch (Exception e)
             {
                 if (settings.logCatchedExceptions) OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+                if (settings.jsonLines) SkipFailedJsonLineUnlocked();
                 Reset();
                 if (settings.rethrowExceptions) throw;
                 item = default;
@@ -380,6 +382,7 @@ public sealed partial class JsonDeserializer
             catch (Exception e)
             {
                 OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+                if (settings.jsonLines) SkipFailedJsonLineUnlocked();
                 if (settings.rethrowExceptions) throw;
             }
             finally
@@ -444,6 +447,7 @@ public sealed partial class JsonDeserializer
             catch (Exception e)
             {
                 OptLog.ERROR()?.Build($"Exception occurred on deserialation at buffer position {buffer.BufferPos}. SampleFromBuffer(50 chars before and after): {buffer.ShowBufferAroundCurrentPosition(50, 50)}", e);
+                if (settings.jsonLines) SkipFailedJsonLineUnlocked();
                 if (settings.rethrowExceptions) throw;
             }
             finally

@@ -291,7 +291,7 @@ namespace FeatureLoom.Serialization
         [Fact]
         public void Serialize_FirstMemberIgnored_Indented_NoMalformedCommas()
         {
-            var serializer = new JsonSerializer(new JsonSerializer.Settings { indent = true });
+            var serializer = new JsonSerializer(new JsonSerializer.Settings { formatting = JsonSerializer.JsonFormatting.Indented });
 
             string json = serializer.Serialize(new FirstMemberIgnored());
 
@@ -304,7 +304,7 @@ namespace FeatureLoom.Serialization
         [Fact]
         public void Serialize_AllMembersIgnored_Indented_NoMalformedCommas()
         {
-            var serializer = new JsonSerializer(new JsonSerializer.Settings { indent = true });
+            var serializer = new JsonSerializer(new JsonSerializer.Settings { formatting = JsonSerializer.JsonFormatting.Indented });
 
             string json = serializer.Serialize(new AllMembersIgnored());
 
@@ -314,7 +314,7 @@ namespace FeatureLoom.Serialization
         [Fact]
         public void Serialize_NestedObjectWithIgnoredMembers_Indented_NoMalformedCommas()
         {
-            var serializer = new JsonSerializer(new JsonSerializer.Settings { indent = true });
+            var serializer = new JsonSerializer(new JsonSerializer.Settings { formatting = JsonSerializer.JsonFormatting.Indented });
 
             string json = serializer.Serialize(new OuterWithIgnoredInner
             {

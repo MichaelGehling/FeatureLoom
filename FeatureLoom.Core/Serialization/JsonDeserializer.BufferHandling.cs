@@ -21,8 +21,40 @@ public sealed partial class JsonDeserializer
         serializerLock.Enter();
         try
         {
-            ByteSegment delimiterBytes = Encoding.UTF8.GetBytes(delimiter);
+            SkipBufferUntilUnlocked(Encoding.UTF8.GetBytes(delimiter), alsoSkipDelimiter, out found);
+        }
+        finally
+        {
+            serializerLock.Exit();
+        }
+    }
 
+    private static readonly ByteSegment lineFeedDelimiter = new byte[] { (byte)'\n' };
+
+    /// <summary>
+    /// JSON Lines recovery after a failed deserialization (caller must hold the lock).
+    /// Rewinds to the start of the failed value before searching the line feed: a parser that
+    /// already read into the next line must not cause that line to be skipped, too.
+    /// Leading whitespace is skipped first, because it usually is the previous line's terminator.
+    /// </summary>
+    private void SkipFailedJsonLineUnlocked()
+    {
+        buffer.RewindToValueStart();
+        SkipWhiteSpaces();
+        SkipBufferUntilUnlocked(lineFeedDelimiter, true, out bool found);
+        if (!found)
+        {
+            // Broken last line without terminator: the source is exhausted, so discard the rest
+            // (the generic skip keeps trailing bytes in case of a delimiter split across reads).
+            buffer.ResetBuffer(false, false);
+        }
+    }
+
+    private void SkipBufferUntilUnlocked(ByteSegment delimiterBytes, bool alsoSkipDelimiter, out bool found)
+    {
+        found = false;
+        try
+        {
             if (buffer.CountRemainingBytes < delimiterBytes.Count)
             {
                 if (buffer.CountSizeLeft == 0) buffer.ResetBuffer(true, false);
@@ -57,10 +89,6 @@ public sealed partial class JsonDeserializer
         catch (Exception ex)
         {
             OptLog.ERROR()?.Build("Error occurred on skipping buffer.", ex);
-        }
-        finally
-        {
-            serializerLock.Exit();
         }
     }
 
