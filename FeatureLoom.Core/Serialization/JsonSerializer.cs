@@ -352,6 +352,7 @@ namespace FeatureLoom.Serialization
                 if (item == null)
                 {
                     writer.WriteNullValue();
+                    writer.WriteBufferToStream();
                     return;
                 }
 
@@ -380,18 +381,24 @@ namespace FeatureLoom.Serialization
             }        
         }
 
-        // Will only write async to the stream for the final data chunk,
-        // so define a sufficient buffer, otherwise the intermediate writings will be blocking!
+        /// <summary>
+        /// Serializes the item to the stream. Intermediate flushes use double buffering: a full
+        /// buffer is written asynchronously while serialization continues in a second buffer.
+        /// Serialization itself is synchronous, so it only blocks if the previous write is still
+        /// running when the next buffer is full (stream slower than serialization).
+        /// </summary>
         public async Task SerializeAsync<T>(Stream stream, T item)
         {
             serializerLock.Enter();
             try
             {
                 writer.stream = stream;
+                writer.BeginAsyncMode();
 
                 if (item == null)
                 {
                     writer.WriteNullValue();
+                    await writer.WriteBufferToStreamAsync();
                     return;
                 }
 
@@ -415,6 +422,7 @@ namespace FeatureLoom.Serialization
             }
             finally
             {
+                await writer.CompleteAsyncModeAsync();
                 FinishSerialization();
                 serializerLock.Exit();
             }

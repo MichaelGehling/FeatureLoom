@@ -143,8 +143,27 @@ public sealed partial class JsonSerializer
             set => mainBufferCount = value;
         }
 
+        // Double buffering for async serialization: while a full buffer is written asynchronously,
+        // serialization continues in the spare buffer. At most one write is in flight, so the
+        // stream is never accessed concurrently and the chunk order is preserved.
+        private bool asyncMode;
+        private byte[] spareBuffer;
+        private Task pendingWrite;
+
+        /// <summary>
+        /// Enables double buffering: intermediate flushes start an async write and swap buffers
+        /// instead of writing synchronously. Must be finished with <see cref="CompleteAsyncModeAsync"/>.
+        /// </summary>
+        public void BeginAsyncMode() => asyncMode = true;
+
         public void WriteBufferToStream()
         {
+            if (asyncMode)
+            {
+                StartAsyncWriteAndSwapBuffers();
+                return;
+            }
+
             try
             {
                 stream.Write(mainBuffer, 0, mainBufferCount);
@@ -156,17 +175,83 @@ public sealed partial class JsonSerializer
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void StartAsyncWriteAndSwapBuffers()
+        {
+            if (mainBufferCount == 0) return;
+
+            // Only blocks if the stream is slower than the serialization.
+            WaitForPendingWrite();
+
+            try
+            {
+                pendingWrite = stream.WriteAsync(mainBuffer, 0, mainBufferCount);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Failed writing to stream", ex);
+            }
+
+            // The main buffer may have been extended, so the spare buffer must match its size.
+            if (spareBuffer == null || spareBuffer.Length != mainBuffer.Length) spareBuffer = new byte[mainBuffer.Length];
+            var temp = mainBuffer;
+            mainBuffer = spareBuffer;
+            spareBuffer = temp;
+            mainBufferCount = 0;
+        }
+
+        private void WaitForPendingWrite()
+        {
+            var task = pendingWrite;
+            if (task == null) return;
+            pendingWrite = null;
+            try
+            {
+                task.GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Failed writing to stream", ex);
+            }
+        }
+
         public async Task WriteBufferToStreamAsync()
         {
             try
             {
+                var task = pendingWrite;
+                if (task != null)
+                {
+                    pendingWrite = null;
+                    await task.ConfiguredAwait();
+                }
                 await stream.WriteAsync(mainBuffer, 0, mainBufferCount).ConfiguredAwait();
                 mainBufferCount = 0;
             }
             catch (Exception ex)
             {
                 throw new Exception("Failed writing to stream", ex);
+            }
+        }
+
+        /// <summary>
+        /// Leaves the async mode. Waits for a still pending write (e.g. after a failure), so the
+        /// buffers are not reused while the stream may still read from them. Exceptions of that
+        /// write are ignored, because the serialization already failed.
+        /// </summary>
+        public async Task CompleteAsyncModeAsync()
+        {
+            asyncMode = false;
+            var task = pendingWrite;
+            if (task == null) return;
+            pendingWrite = null;
+            try
+            {
+                await task.ConfiguredAwait();
+            }
+            catch
+            {
+                // Already failed, original exception is propagated by the caller.
             }
         }
 

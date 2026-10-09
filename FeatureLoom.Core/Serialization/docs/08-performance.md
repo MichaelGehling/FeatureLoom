@@ -48,8 +48,23 @@ but under heavy concurrent load they become a contention point.
 | `referenceFormat` | `JsonPath` | `IdBased` is faster to write, `JsonPath` produces less output |
 | `typeInfoHandling` | `AddDeviatingTypeInfo` | `AddAllTypeInfo` adds output size and work |
 | `indent` | `false` | indentation costs size and time; keep it for diagnostics |
-| `writeBufferChunkSize` | 64 KB | chunk size when writing to streams |
+| `writeBufferChunkSize` | 64 KB | chunk size when writing to streams; `SerializeAsync` uses two buffers of this size, see below |
 | `tempBufferSize` | 8 KB | scratch buffer for number/string formatting |
+
+### Async serialization to streams
+
+`SerializeAsync(stream, item)` walks the object graph synchronously, but writes asynchronously
+through double buffering. When the buffer is full, an async write for it is started and
+serialization continues in a second buffer. Only one write is in flight at a time, so the stream
+is never accessed concurrently and the chunk order is preserved.
+
+- Serialization only blocks if the previous write is still running when the next buffer is
+  full, i.e. if the stream is slower than the serialization. A larger `writeBufferChunkSize`
+  reduces the number of such waits.
+- The second buffer is allocated on first use and kept for later calls on the same serializer
+  instance.
+- If a write fails, the exception is propagated and the serializer remains usable.
+- The synchronous `Serialize(stream, item)` is unaffected.
 
 ### Deserializer
 

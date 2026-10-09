@@ -28,7 +28,7 @@ JsonHelper.DefaultDeserializer.TryDeserialize(json, out Order copy);
 |---|---|
 | `string` | `serializer.Serialize(item)` |
 | `Stream` (sync) | `serializer.Serialize(stream, item)` |
-| `Stream` (async) | `await serializer.SerializeAsync(stream, item)` |
+| `Stream` (async) | `await serializer.SerializeAsync(stream, item)` (double-buffered async writes, see [08](08-performance.md#async-serialization-to-streams)) |
 
 ## Deserializing
 
