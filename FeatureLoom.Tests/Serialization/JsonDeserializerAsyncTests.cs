@@ -115,6 +115,43 @@ namespace FeatureLoom.Serialization
             Assert.All(records, r => Assert.Equal(5000, r.values.Count));
         }
 
+        // Covers BufferExceededException with a pending read-ahead in all variants: buffer growth
+        // (value starts early in the buffer) and compaction without growth (value starts late),
+        // small/large chunks, with/without delay and mixed record sizes. Content is verified exactly.
+        [Theory]
+        [InlineData(256, 7, 0)]
+        [InlineData(256, 2000, 1)]
+        [InlineData(1024, 4096, 0)]
+        [InlineData(1024, 333, 0)]
+        [InlineData(1024, 3000, 1)]
+        [InlineData(4096, 50000, 0)]
+        public async Task TryDeserializeAsync_BufferExceeded_KeepsAllData(int bufferSize, int chunkSize, int delayMs)
+        {
+            int[] sizes = { 3, 800, 1, 50, 3000, 2, 2, 1500, 10, 4000, 5 };
+            var serializer = new JsonSerializer(new JsonSerializer.Settings { formatting = JsonSerializer.JsonFormatting.JsonLines });
+            var sb = new StringBuilder();
+            for (int i = 0; i < sizes.Length; i++)
+            {
+                var values = new List<int>();
+                for (int v = 0; v < sizes[i]; v++) values.Add(i * 100000 + v);
+                sb.Append(serializer.Serialize(new Record { id = i, name = new string('x', i * 37), values = values }));
+            }
+            var stream = new SlowChunkStream(Encoding.UTF8.GetBytes(sb.ToString()), chunkSize, delayMs);
+            var deserializer = new JsonDeserializer(new JsonDeserializer.Settings { initialBufferSize = bufferSize });
+            deserializer.SetDataSource(stream);
+
+            var records = await ReadAllAsync(deserializer);
+
+            Assert.Equal(sizes.Length, records.Count);
+            for (int i = 0; i < sizes.Length; i++)
+            {
+                Assert.Equal(i, records[i].id);
+                Assert.Equal(new string('x', i * 37), records[i].name);
+                Assert.Equal(sizes[i], records[i].values.Count);
+                for (int v = 0; v < sizes[i]; v++) Assert.Equal(i * 100000 + v, records[i].values[v]);
+            }
+        }
+
         [Fact]
         public async Task TryDeserializeAsync_EmptyStream_ReturnsFalse()
         {
