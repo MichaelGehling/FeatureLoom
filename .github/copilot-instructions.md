@@ -44,3 +44,4 @@ Detailed rules live in `.github/skills/` and load automatically by file scope:
 
 ## Performance Considerations
 - FeatureLoom's `Service<T>.Instance/Get` accessors are intended to be nearly free on the steady-state path, without requiring callers to cache the service reference except in very hot loops. Be mindful of synchronization changes that may introduce access overhead.
+- In FeatureLoom code, use FeatureLoom's `.ConfiguredAwait()` (FeatureLoom.Synchronization.AwaitConfig) instead of `.ConfigureAwait(false)`.

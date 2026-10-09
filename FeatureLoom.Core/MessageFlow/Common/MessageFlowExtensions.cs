@@ -264,6 +264,12 @@ namespace FeatureLoom.MessageFlow
         /// <returns>
         /// The connected message source (the batcher as a source). Note: output is untyped and may be either T or T[] depending on <paramref name="sendSingleMessagesAsArray"/>.
         /// </returns>
+        /// <remarks>
+        /// The time-based flush is driven by an <see cref="Aggregator{T}"/> whose schedule is only weakly referenced.
+        /// Keep a strong reference to the source or the returned batcher as long as pending batches must be flushed;
+        /// otherwise they may be garbage-collected and the last batch is never emitted
+        /// (most likely on .NET Framework 4.8 Release builds, where the JIT shortens local lifetimes aggressively).
+        /// </remarks>
         public static IMessageSource BatchMessages<T>(
             this IMessageSource source,
             int maxBatchSize,

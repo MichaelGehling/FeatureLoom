@@ -21,10 +21,16 @@ public class MessageFlowExtensions_Batcher_Overload_Tests
 
         source.Send(7);
 
-        // Allow time-based flush
-        await Task.Delay(300);
+        // Allow time-based flush. Poll instead of a fixed delay to tolerate a loaded machine.
+        object first = null;
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (!recv.TryReceive(out first) && DateTime.UtcNow < deadline) await Task.Delay(20);
+        // The batcher's timeout schedule is only weakly referenced; keep the flow alive until here,
+        // otherwise a GC triggered by parallel tests may collect it before the flush (seen on net48 Release).
+        GC.KeepAlive(source);
+        GC.KeepAlive(batched);
 
-        Assert.True(recv.TryReceive(out var first));
+        Assert.NotNull(first);
         // With sendSingleMessagesAsArray=false and a 1-item batch, we expect a single T (int), not int[]
         var single = Assert.IsType<int>(first);
         Assert.Equal(7, single);

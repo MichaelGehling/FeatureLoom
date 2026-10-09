@@ -160,6 +160,8 @@ namespace FeatureLoom.MessageFlow
         }
 
         // Helper: create owned socket and return only a weak reference to the owner.
+        // NoInlining: otherwise the JIT may keep the owner in a caller stack slot and it never dies.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static WeakReference CreateOwnedSocket(Hub hub, IMessageSink sink)
         {
             var owner = new object();

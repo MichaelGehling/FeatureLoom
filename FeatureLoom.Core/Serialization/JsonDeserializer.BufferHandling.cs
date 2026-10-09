@@ -1,9 +1,11 @@
-﻿using FeatureLoom.Collections;
+using FeatureLoom.Synchronization;
+using FeatureLoom.Collections;
 using FeatureLoom.Extensions;
 using FeatureLoom.Logging;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -106,6 +108,56 @@ public sealed partial class JsonDeserializer
         {
             serializerLock.Exit();
         }
+    }
+
+    /// <summary>
+    /// Asynchronously checks whether any non-whitespace data is left in the buffer or the stream.
+    /// Waits for stream data without blocking a thread.
+    /// </summary>
+    public Task<bool> IsAnyDataLeftAsync()
+    {
+        // Fast path: a value start is already buffered, so complete synchronously without async state machine.
+        serializerLock.Enter();
+        try
+        {
+            if (buffer.TrySkipBufferedWhiteSpaces()) return Task.FromResult(true);
+        }
+        finally
+        {
+            serializerLock.Exit();
+        }
+        return IsAnyDataLeftSlowAsync();
+    }
+
+    private async Task<bool> IsAnyDataLeftSlowAsync()
+    {
+        // The lock must be held until the await completes, so this needs its own async method.
+        serializerLock.Enter();
+        try
+        {
+            buffer.ReadAheadEnabled = true;
+            return await WaitForValueStartUnlockedAsync().ConfiguredAwait();
+        }
+        finally
+        {
+            buffer.ReadAheadEnabled = false;
+            serializerLock.Exit();
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously waits until the start of the next value is buffered, so that parsing does not
+    /// block at the beginning of a value (e.g. waiting for the next JSON Lines record).
+    /// Starts a background read-ahead afterwards. Returns false if the source has no further data.
+    /// </summary>
+    private async Task<bool> WaitForValueStartUnlockedAsync()
+    {
+        while (!buffer.TrySkipBufferedWhiteSpaces())
+        {
+            if (!await buffer.TryReadFromStreamAsync().ConfiguredAwait()) return false;
+        }
+        buffer.StartReadAhead();
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

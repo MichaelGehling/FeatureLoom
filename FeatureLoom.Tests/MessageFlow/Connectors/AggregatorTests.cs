@@ -187,8 +187,11 @@ namespace FeatureLoom.MessageFlow
             aggregator.Post("a");
             aggregator.Post("b");
 
-            // Allow time for ~2 ticks
-            AppTime.Wait(250.Milliseconds());
+            // Allow time for ~2 ticks; poll with a generous deadline to tolerate a loaded machine.
+            var deadline = AppTime.Now + 5.Seconds();
+            while (System.Threading.Volatile.Read(ref ticks) < 2 && AppTime.Now < deadline) AppTime.Wait(20.Milliseconds());
+            // The timeout schedule is only weakly referenced; keep the aggregator alive until here.
+            GC.KeepAlive(aggregator);
 
             // We should have at least 2 ticks; assert tick messages are present
             var all = sink.ReceiveAll().ToArray();

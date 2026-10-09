@@ -26,6 +26,11 @@ namespace FeatureLoom.MessageFlow;
 /// - When <c>resetTimeoutOnMessage == true</c>, the timeout is inactivity-based (each message resets the window).
 /// - When <c>resetTimeoutOnMessage == false</c>, the timeout fires in fixed periods (no reset on messages).
 /// - Scheduling uses weak references; schedules are cleaned up automatically when no longer strongly referenced.
+/// - Lifetime caveat: the scheduler does NOT keep the aggregator alive. If the application holds no strong reference
+///   (e.g. only the upstream source references it, and that source itself is unreachable), the aggregator may be
+///   garbage-collected and a pending timeout (e.g. a final flush) will silently never fire.
+///   The JIT may consider locals dead before the end of their scope (notably on .NET Framework 4.8 Release builds),
+///   so keep a field reference or use <see cref="GC.KeepAlive(object)"/> as long as timeouts must be delivered.
 ///
 /// Concurrency and reentrancy
 /// - When <c>autoLock == true</c>, handlers are executed inside a <see cref="FeatureLock"/> to simplify thread-safety.

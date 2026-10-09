@@ -12,6 +12,8 @@ processed record by record. The buffer, readers and string cache stay warm betwe
 | `SetDataSource(string)` / `(byte[])` / `(byte[], offset, count)` / `(ByteSegment)` / `(JsonFragment, …)` | Bind in-memory JSON (UTF-16 string or UTF-8 bytes). |
 | `TryDeserialize<T>(out T)` / `TryDeserialize(Type, out object)` | Read the **next** value from the bound source. Returns `false` if no value is left or reading failed. |
 | `IsAnyDataLeft()` | Skips whitespace and tells whether another (non-whitespace) value follows. For streams it pulls more data if the buffer is exhausted. |
+| `TryDeserializeAsync<T>()` / `TryDeserializeAsync<T>(Stream)` | Async variant of `TryDeserialize`; returns `(bool success, T item)`. See [Async reading](#async-reading). |
+| `IsAnyDataLeftAsync()` | Async variant of `IsAnyDataLeft()`. Completes synchronously if a value is already buffered. |
 | `SkipBufferUntil(delimiter, alsoSkipDelimiter, out found)` | Advances to the next occurrence of a UTF-8 delimiter (e.g. `"\n"`); optionally consumes the delimiter itself. Works across buffer/chunk boundaries. |
 | `ShowBufferAroundCurrentPosition(before, after)` | Diagnostic snippet of the buffer around the current read position. |
 
@@ -89,6 +91,29 @@ deserializer.TryDeserialize(out int value); // 42
 With `alsoSkipDelimiter: false` the read position stays *on* the delimiter – useful if the
 delimiter itself is the start of the next value (e.g. `"{"`).
 
+## Async reading
+
+```csharp
+deserializer.SetDataSource(networkStream);
+
+while (await deserializer.IsAnyDataLeftAsync())
+{
+	var (success, entry) = await deserializer.TryDeserializeAsync<LogEntry>();
+	if (success) Process(entry);
+}
+```
+
+- **Waiting for the next value is non-blocking:** the start of the next value is awaited without
+  blocking a thread, e.g. while waiting for the next JSON Lines record.
+- **Read-ahead in parallel to parsing:** the parsing itself runs on the calling thread without
+  further awaits. In parallel, one background `ReadAsync` fills the free part of the buffer. Only if
+  the parser catches up with that read does it wait (blocking) for it (same compromise as the
+  double-buffered `SerializeAsync`).
+- **Large values:** the buffer grows like in the synchronous API; a pending read is completed first.
+- **Mixing:** sync and async calls can be mixed on the same instance; the order of values is kept.
+- **Thread safety:** the instance stays locked for the whole async call. Do not call other members of
+  the same instance concurrently from the awaiting code path.
+
 ## Skipping values
 
 - **Unwanted records:** deserialize into `JsonFragment` – the value is consumed and kept as raw
@@ -103,8 +128,9 @@ delimiter itself is the start of the next value (e.g. `"{"`).
 
 - **Buffer growth:** a single value larger than the buffer (`initialBufferSize`) causes the buffer to
   grow and the read to be retried transparently; the source is not re-read.
-- **Blocking:** stream reads are synchronous (`Stream.Read`). On network streams `IsAnyDataLeft()`
-  and `TryDeserialize` block until data arrives or the stream ends.
+- **Blocking:** the synchronous API uses `Stream.Read`. On network streams `IsAnyDataLeft()`
+  and `TryDeserialize` block until data arrives or the stream ends. Use the async API to avoid
+  blocking while waiting for the next value.
 - **End of data:** `IsAnyDataLeft()` returns `false` once only whitespace is left and the stream
   reports no further bytes.
 - **Thread safety:** all members lock the instance; one deserializer serves one source at a time.
@@ -120,7 +146,7 @@ delimiter itself is the start of the next value (e.g. `"{"`).
 | NDJSON | ✅ out of the box | ⚠ STJ 9+ via `topLevelValues: true`; older versions need manual line splitting | ✅ with `SupportMultipleContent` |
 | Resync after a broken record | ✅ automatic with `inputFormat = JsonLines`, or manual via `SkipBufferUntil(delimiter)` | ❌ reader state is invalid after an error | ❌ reader state is invalid after an error |
 | Skip to arbitrary delimiter / prefix | ✅ | ❌ | ❌ |
-| Async streaming | ❌ synchronous reads | ✅ | ⚠ partial |
+| Async streaming | ⚠ async wait for values + background read-ahead; parser may block briefly if it catches up | ✅ | ⚠ partial |
 
 > ⚠ **Competitor limitation:** after a `JsonException`, both STJ and Newtonsoft readers cannot
 > continue on the same stream – one malformed NDJSON line ends the whole import unless the input is

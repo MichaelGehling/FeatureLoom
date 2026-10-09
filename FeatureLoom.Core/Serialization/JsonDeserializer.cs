@@ -12,6 +12,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
@@ -211,9 +212,9 @@ public sealed partial class JsonDeserializer
     /// Fast path of the generic deserialization. It is kept free of a retry loop and of a
     /// finally-funclet, because both add fixed cost to every single call. Reset() is invoked
     /// explicitly on each exit instead, and the rare recovery/retry handling is delegated to
-    /// the cold <see cref="TryDeserializeLockedAfterBufferExceeded{T}(out T)"/>.
+    /// the cold <see cref="TryDeserializeUnlockedAfterBufferExceeded{T}(out T)"/>.
     /// </summary>
-    private bool TryDeserializeLocked<T>(out T item)
+    private bool TryDeserializeUnlocked<T>(out T item)
     {
         try
         {
@@ -250,7 +251,7 @@ public sealed partial class JsonDeserializer
         }
         catch (BufferExceededException)
         {
-            return TryDeserializeLockedAfterBufferExceeded(out item);
+            return TryDeserializeUnlockedAfterBufferExceeded(out item);
         }
         catch (Exception e)
         {
@@ -264,11 +265,11 @@ public sealed partial class JsonDeserializer
     }
 
     /// <summary>
-    /// Cold continuation of <see cref="TryDeserializeLocked{T}(out T)"/> that refills the buffer
+    /// Cold continuation of <see cref="TryDeserializeUnlocked{T}(out T)"/> that refills the buffer
     /// and retries after a <see cref="BufferExceededException"/>.
     /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private bool TryDeserializeLockedAfterBufferExceeded<T>(out T item)
+    private bool TryDeserializeUnlockedAfterBufferExceeded<T>(out T item)
     {
         while (true)
         {
@@ -332,7 +333,7 @@ public sealed partial class JsonDeserializer
         }
     }
 
-    private bool TryDeserializeLocked(Type itemType, out object item)
+    private bool TryDeserializeUnlocked(Type itemType, out object item)
     {
         item = default;
         bool retry = false;
@@ -466,7 +467,7 @@ public sealed partial class JsonDeserializer
         serializerLock.Enter();
         try
         {
-            return TryDeserializeLocked(out item);
+            return TryDeserializeUnlocked(out item);
         }
         finally
         {
@@ -474,12 +475,52 @@ public sealed partial class JsonDeserializer
         }
     }
 
+    /// <summary>
+    /// Asynchronously deserializes the next value from the current stream data source.
+    /// The start of the value is awaited asynchronously; while parsing, further data is read ahead
+    /// in the background into the free part of the buffer. If the parser catches up with the
+    /// read-ahead, it waits synchronously for the pending read (the parser itself is synchronous).
+    /// Large values make the buffer grow just like for the synchronous API.
+    /// </summary>
+    /// <returns>Success flag and the deserialized item.</returns>
+    public async Task<(bool success, T item)> TryDeserializeAsync<T>()
+    {
+        // MicroValueLock is not thread-affine, so it may be held across the await.
+        serializerLock.Enter();
+        try
+        {
+            buffer.ReadAheadEnabled = true;
+            if (!await WaitForValueStartUnlockedAsync().ConfiguredAwait())
+            {
+                Reset();
+                return (false, default);
+            }
+            bool success = TryDeserializeUnlocked(out T item);
+            return (success, item);
+        }
+        finally
+        {
+            buffer.ReadAheadEnabled = false;
+            serializerLock.Exit();
+        }
+    }
+
+    /// <summary>
+    /// Sets the stream as data source and asynchronously deserializes the next value.
+    /// See <see cref="TryDeserializeAsync{T}()"/>.
+    /// </summary>
+    public async Task<(bool success, T item)> TryDeserializeAsync<T>(Stream stream)
+    {
+        SetDataSource(stream);
+        return await TryDeserializeAsync<T>().ConfiguredAwait();
+    }
+
     public bool TryDeserialize(Type type, out object item)
     {
         serializerLock.Enter();
         try
         {
-            return TryDeserializeLocked(type, out item);
+            return TryDeserializeUnlocked(type, out item);
         }
         finally
         {
@@ -493,7 +534,7 @@ public sealed partial class JsonDeserializer
         try
         {
             SetDataSourceUnlocked(stream);
-            return TryDeserializeLocked(out item);
+            return TryDeserializeUnlocked(out item);
         }
         finally
         {
@@ -507,7 +548,7 @@ public sealed partial class JsonDeserializer
         try
         {
             SetDataSourceUnlocked(stream);
-            return TryDeserializeLocked(type, out item);
+            return TryDeserializeUnlocked(type, out item);
         }
         finally
         {
@@ -521,7 +562,7 @@ public sealed partial class JsonDeserializer
         try
         {
             SetDataSourceUnlocked(json);
-            return TryDeserializeLocked(out item);
+            return TryDeserializeUnlocked(out item);
         }
         finally
         {
@@ -535,7 +576,7 @@ public sealed partial class JsonDeserializer
         try
         {
             SetDataSourceUnlocked(json);
-            return TryDeserializeLocked(type, out item);
+            return TryDeserializeUnlocked(type, out item);
         }
         finally
         {
@@ -549,7 +590,7 @@ public sealed partial class JsonDeserializer
         try
         {
             SetDataSourceUnlocked(utf8Bytes);
-            return TryDeserializeLocked(out item);
+            return TryDeserializeUnlocked(out item);
         }
         finally
         {
@@ -563,7 +604,7 @@ public sealed partial class JsonDeserializer
         try
         {
             SetDataSourceUnlocked(utf8Bytes);
-            return TryDeserializeLocked(type, out item);
+            return TryDeserializeUnlocked(type, out item);
         }
         finally
         {
@@ -587,7 +628,7 @@ public sealed partial class JsonDeserializer
                 item = default;
                 return false;
             }
-            return TryDeserializeLocked(out item);
+            return TryDeserializeUnlocked(out item);
         }
         finally
         {
@@ -607,7 +648,7 @@ public sealed partial class JsonDeserializer
                 item = default;
                 return false;
             }
-            return TryDeserializeLocked(type, out item);
+            return TryDeserializeUnlocked(type, out item);
         }
         finally
         {

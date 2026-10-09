@@ -79,6 +79,15 @@ is never accessed concurrently and the chunk order is preserved.
 | `populateExistingMembers` | `true` | reuses existing member instances instead of allocating new ones |
 | `typeSelfConfigurationMode` | `IgnoreButWarn` | `EnabledKeepRefTrackingOff` keeps the reference-tracking shortcut, see page 03 |
 
+### Async deserialization from streams
+
+`TryDeserializeAsync<T>()` awaits the start of the next value asynchronously. The parsing itself
+then runs on the calling thread without further awaits, in parallel to one background `ReadAsync`
+that fills the free part of the buffer (read-ahead). The parser only blocks if it catches up with
+that read, i.e. if the stream is slower than parsing. A larger
+`initialBufferSize` leaves more room for read-ahead. `IsAnyDataLeftAsync()` completes synchronously
+when a value is already buffered. The synchronous API is unaffected.
+
 ## String cache
 
 Recurring string values (status codes, currencies, names, enum-like strings) are materialized once
