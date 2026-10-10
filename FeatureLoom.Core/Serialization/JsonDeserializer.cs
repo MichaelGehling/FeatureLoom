@@ -477,20 +477,65 @@ public sealed partial class JsonDeserializer
 
     /// <summary>
     /// Asynchronously deserializes the next value from the current stream data source.
-    /// The start of the value is awaited asynchronously; while parsing, further data is read ahead
-    /// in the background into the free part of the buffer. If the parser catches up with the
-    /// read-ahead, it waits synchronously for the pending read (the parser itself is synchronous).
-    /// Large values make the buffer grow just like for the synchronous API.
+    /// The complete value is awaited asynchronously (without blocking a thread) before it is parsed
+    /// synchronously from the buffer; meanwhile further data is read ahead in the background.
+    /// Completes synchronously if the value is already buffered.
+    /// Large values make the buffer grow up front.
     /// </summary>
     /// <returns>Success flag and the deserialized item.</returns>
-    public async Task<(bool success, T item)> TryDeserializeAsync<T>()
+    public Task<(bool success, T item)> TryDeserializeAsync<T>()
     {
-        // MicroValueLock is not thread-affine, so it may be held across the await.
+        if (TryDeserializeBuffered(out T item, out bool success)) return Task.FromResult((success, item));
+        return TryDeserializeSlowAsync<T>();
+    }
+
+#if !NETSTANDARD2_0
+    /// <summary>
+    /// Like <see cref="TryDeserializeAsync{T}()"/>, but returns a <see cref="ValueTask{TResult}"/>, so no
+    /// allocation is needed if the value is already buffered (the common case for many small values).
+    /// </summary>
+    /// <returns>Success flag and the deserialized item.</returns>
+    public ValueTask<(bool success, T item)> TryDeserializeValueAsync<T>()
+    {
+        if (TryDeserializeBuffered(out T item, out bool success)) return new ValueTask<(bool success, T item)>((success, item));
+        return new ValueTask<(bool success, T item)>(TryDeserializeSlowAsync<T>());
+    }
+#endif
+
+    // Fast path: if the complete next value is already buffered, it is parsed synchronously without
+    // an async state machine and the lock is released. Returns false if waiting for stream data is
+    // required; in that case the lock is STILL HELD and must be passed on to TryDeserializeSlowAsync,
+    // so the lock is only acquired once per call.
+    private bool TryDeserializeBuffered<T>(out T item, out bool success)
+    {
         serializerLock.Enter();
         try
         {
+            if (!buffer.HasPendingRead && IsFullValueBufferedUnlocked())
+            {
+                success = TryDeserializeUnlocked(out item);
+                serializerLock.Exit();
+                return true;
+            }
+        }
+        catch
+        {
+            serializerLock.Exit();
+            throw;
+        }
+        item = default;
+        success = false;
+        return false;
+    }
+
+    // Expects the serializer lock to be held by the caller (see TryDeserializeBuffered) and releases it.
+    private async Task<(bool success, T item)> TryDeserializeSlowAsync<T>()
+    {
+        // MicroValueLock is not thread-affine, so it may be held across the await.
+        try
+        {
             buffer.ReadAheadEnabled = true;
-            if (!await WaitForValueStartUnlockedAsync().ConfiguredAwait())
+            if (!await WaitForValueStartUnlockedAsync(true).ConfiguredAwait())
             {
                 Reset();
                 return (false, default);
@@ -501,6 +546,7 @@ public sealed partial class JsonDeserializer
         finally
         {
             buffer.ReadAheadEnabled = false;
+            buffer.ScanLineFeeds = false;
             serializerLock.Exit();
         }
     }

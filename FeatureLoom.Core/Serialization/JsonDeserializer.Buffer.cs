@@ -38,6 +38,30 @@ public sealed partial class JsonDeserializer
         bool readAheadEnabled;
         public bool ReadAheadEnabled { get => readAheadEnabled; set => readAheadEnabled = value; }
 
+        // JSON Lines line feed tracking (async only): a raw LF can only be a record terminator, so a
+        // buffered LF behind the value start proves that the complete root value is buffered.
+        // The read-ahead task scans its own bytes in parallel to parsing; the result is only taken
+        // over by the parser thread after the task completed (no further synchronization needed).
+        bool scanLineFeeds;
+        bool pendingReadScanned;
+        int pendingReadLastLf = -1;
+        int lastLfPos = -1;   // position of a known LF in the buffer, or -1
+        int lfScanPos = 0;    // bytes before this position were scanned (lastLfPos is the last LF found there)
+        public bool ScanLineFeeds { get => scanLineFeeds; set => scanLineFeeds = value; }
+
+        // Value end scan (async only, non JSON Lines): a cheap structural scan (brackets, strings, escapes)
+        // that detects when the complete root value is buffered, so the synchronous parser can run
+        // without ever waiting (blocking) for stream data. State is resumable across reads.
+        int valueScanPos = -1;
+        int valueScanStartPos = -1;
+        int valueScanDepth;
+        bool valueScanInString;
+        bool valueScanEscape;
+        bool valueScanStarted;
+        bool valueScanComplete;
+        public bool HasPendingRead => pendingRead != null;
+        public bool NeedsCompaction => bufferStartPos > bufferResetLevel;
+
         public byte CurrentByte => buffer[bufferPos];
         public int BufferPos { get{ return bufferPos; } set{ bufferPos = value; } }
         public bool BufferReadTillEnd { get{ return bufferReadTillEnd; } set{ bufferReadTillEnd = value; } }
@@ -184,12 +208,195 @@ public sealed partial class JsonDeserializer
             if (free <= 0) return;
             try
             {
-                pendingRead = stream.ReadAsync(buffer, bufferFillLevel, free);
+                pendingReadLastLf = -1;
+                pendingReadScanned = scanLineFeeds;
+                pendingRead = scanLineFeeds ? ReadAndScanAsync(stream, buffer, bufferFillLevel, free) : stream.ReadAsync(buffer, bufferFillLevel, free);
             }
             catch
             {
                 pendingRead = null;
             }
+        }
+
+        private async Task<int> ReadAndScanAsync(Stream source, byte[] target, int offset, int count)
+        {
+            int bytesRead = await source.ReadAsync(target, offset, count).ConfiguredAwait();
+            pendingReadLastLf = bytesRead > 0 ? FindLastLineFeed(target, offset, bytesRead) : -1;
+            return bytesRead;
+        }
+
+        private static int FindLastLineFeed(byte[] data, int offset, int count)
+        {
+#if NETSTANDARD2_0
+            return Array.LastIndexOf(data, (byte)'\n', offset + count - 1, count);
+#else
+            int index = new ReadOnlySpan<byte>(data, offset, count).LastIndexOf((byte)'\n');
+            return index < 0 ? -1 : offset + index;
+#endif
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ApplyPendingRead(int bytesRead)
+        {
+            int offset = bufferFillLevel;
+            ApplyRead(bytesRead);
+            if (!pendingReadScanned) return;
+            if (pendingReadLastLf >= 0) lastLfPos = pendingReadLastLf;
+            if (lfScanPos == offset) lfScanPos = bufferFillLevel;
+        }
+
+        /// <summary>
+        /// Returns true if a line feed is buffered behind the current position. Only scans bytes
+        /// that were not scanned before (e.g. by the read-ahead task).
+        /// </summary>
+        public bool IsLineFeedBuffered()
+        {
+            if (lastLfPos >= bufferPos) return true;
+            int from = Math.Max(lfScanPos, bufferPos);
+            int count = bufferFillLevel - from;
+            if (count <= 0) return false;
+            lfScanPos = bufferFillLevel;
+            int index = FindLastLineFeed(buffer, from, count);
+            if (index < 0) return false;
+            lastLfPos = index;
+            return true;
+        }
+
+        /// <summary>
+        /// Starts a new value end scan at the current position (must be the value start).
+        /// If a scan for the same value start exists already, it is kept, so its progress is reused.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void BeginValueScan()
+        {
+            if (valueScanStartPos == bufferPos && valueScanPos >= 0) return;
+            valueScanStartPos = bufferPos;
+            valueScanPos = bufferPos;
+            valueScanDepth = 0;
+            valueScanInString = false;
+            valueScanEscape = false;
+            valueScanStarted = false;
+            valueScanComplete = false;
+        }
+
+        /// <summary>
+        /// Continues the value end scan over newly buffered bytes. Returns true if the end of the root
+        /// value is buffered. Root primitives (numbers, literals) end at the first following delimiter,
+        /// so at the very end of the stream the caller must stop waiting on its own.
+        /// </summary>
+        public bool IsValueComplete()
+        {
+            if (valueScanComplete) return valueScanPos < bufferFillLevel;
+            int i = valueScanPos;
+            int end = bufferFillLevel;
+            byte[] data = buffer;
+            while (i < end)
+            {
+#if !NETSTANDARD2_0
+                // Vectorized jumps over the bytes that cannot change the scan state, like the parser's
+                // string/whitespace skipping does. Only the byte at the found index is handled below.
+                if (!valueScanEscape)
+                {
+                    var remaining = new ReadOnlySpan<byte>(data, i, end - i);
+                    int idx;
+                    if (valueScanInString) idx = remaining.IndexOfAny((byte)'"', (byte)'\\');
+                    else if (valueScanDepth > 0) idx = IndexOfStructural(remaining);
+                    else if (valueScanStarted) idx = IndexOfPrimitiveEnd(remaining);
+                    else idx = 0;
+                    if (idx < 0) { i = end; break; }
+                    i += idx;
+                }
+#endif
+                if (valueScanInString)
+                {
+                    byte s = data[i++];
+                    if (valueScanEscape) valueScanEscape = false;
+                    else if (s == (byte)'\\') valueScanEscape = true;
+                    else if (s == (byte)'"')
+                    {
+                        valueScanInString = false;
+                        if (valueScanDepth == 0) return CompleteValueScan(i);
+                    }
+                    continue;
+                }
+
+                byte b = data[i++];
+                // A started root primitive (number, literal) ends at any delimiter; the delimiter only
+                // needs to be buffered, it is not part of the value.
+                if (valueScanStarted && valueScanDepth == 0 &&
+                    (b == (byte)'"' || b == (byte)'{' || b == (byte)'[' || b == (byte)'}' || b == (byte)']'))
+                {
+                    return CompleteValueScan(i);
+                }
+                switch (b)
+                {
+                    case (byte)'"':
+                        valueScanInString = true;
+                        valueScanStarted = true;
+                        break;
+                    case (byte)'{':
+                    case (byte)'[':
+                        valueScanDepth++;
+                        valueScanStarted = true;
+                        break;
+                    case (byte)'}':
+                    case (byte)']':
+                        if (--valueScanDepth <= 0) return CompleteValueScan(i);
+                        break;
+                    case (byte)' ':
+                    case (byte)'\t':
+                    case (byte)'\r':
+                    case (byte)'\n':
+                    case (byte)',':
+                        if (valueScanStarted && valueScanDepth == 0) return CompleteValueScan(i);
+                        break;
+                    default:
+                        valueScanStarted = true;
+                        break;
+                }
+            }
+            valueScanPos = i;
+            return false;
+        }
+
+        #if NET8_0_OR_GREATER
+        static readonly System.Buffers.SearchValues<byte> structuralSearchValues = System.Buffers.SearchValues.Create("\"{}[]"u8);
+        static readonly System.Buffers.SearchValues<byte> primitiveEndSearchValues = System.Buffers.SearchValues.Create(" \t\r\n,{}[]\""u8);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int IndexOfStructural(ReadOnlySpan<byte> span) => span.IndexOfAny(structuralSearchValues);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int IndexOfPrimitiveEnd(ReadOnlySpan<byte> span) => span.IndexOfAny(primitiveEndSearchValues);
+#elif !NETSTANDARD2_0
+        static readonly byte[] structuralBytes = { (byte)'"', (byte)'{', (byte)'}', (byte)'[', (byte)']' };
+        static readonly byte[] primitiveEndBytes = { (byte)' ', (byte)'\t', (byte)'\r', (byte)'\n', (byte)',', (byte)'{', (byte)'}', (byte)'[', (byte)']', (byte)'"' };
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int IndexOfStructural(ReadOnlySpan<byte> span) => span.IndexOfAny(structuralBytes);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int IndexOfPrimitiveEnd(ReadOnlySpan<byte> span) => span.IndexOfAny(primitiveEndBytes);
+#endif
+
+        private bool CompleteValueScan(int pos)
+        {
+            valueScanPos = pos;
+            valueScanComplete = true;
+            // The parser peeks the byte following the value (delimiter check), so that byte must be buffered too.
+            // If it is not yet, the caller keeps waiting; stream end is handled by the caller.
+            return pos < bufferFillLevel;
+        }
+
+        /// <summary>
+        /// Ensures free space for the next read while waiting for a complete line: compacts if the
+        /// current value does not start at the beginning, otherwise grows the buffer.
+        /// Must only be called with the read position at the value start and no pending read.
+        /// </summary>
+        public void EnsureFreeSpaceForLine()
+        {
+            if (pendingRead != null || bufferFillLevel < buffer.Length) return;
+            ResetBuffer(true, bufferStartPos == 0);
         }
 
         /// <summary>Waits (blocking) for the pending read and takes over its bytes. Returns false on end of stream or error.</summary>
@@ -206,7 +413,7 @@ public sealed partial class JsonDeserializer
             {
                 return false;
             }
-            ApplyRead(bytesRead);
+            ApplyPendingRead(bytesRead);
             return bytesRead > 0;
         }
 
@@ -239,6 +446,7 @@ public sealed partial class JsonDeserializer
                 bufferPos = 0;
                 bufferStartPos = 0;
                 bufferFillLevel = 0;
+                ResetLineFeedTracking();
             }
             return false;
         }
@@ -271,7 +479,7 @@ public sealed partial class JsonDeserializer
                 return false;
             }
             pendingRead = null;
-            ApplyRead(bytesRead);
+            ApplyPendingRead(bytesRead);
             return bytesRead > 0;
         }
 
@@ -320,6 +528,17 @@ public sealed partial class JsonDeserializer
                 // Keep the read position relative to the moved data (callers like TryEnsureBuffered
                 // compact in the middle of a token and must continue at the same byte).
                 bufferPos = (bufferPos - bufferStartPos).Clamp(0, bytesToKeep);
+                lastLfPos = lastLfPos >= bufferStartPos ? lastLfPos - bufferStartPos : -1;
+                lfScanPos = (lfScanPos - bufferStartPos).Clamp(0, bytesToKeep);
+                if (valueScanPos >= 0)
+                {
+                    if (valueScanStartPos >= bufferStartPos)
+                    {
+                        valueScanPos = (valueScanPos - bufferStartPos).Clamp(0, bytesToKeep);
+                        valueScanStartPos -= bufferStartPos;
+                    }
+                    else valueScanPos = valueScanStartPos = -1;
+                }
                 bufferStartPos = 0;
                 bufferFillLevel = bytesToKeep;
             }
@@ -328,6 +547,7 @@ public sealed partial class JsonDeserializer
                 bufferPos = 0;
                 bufferStartPos = 0;
                 bufferFillLevel = 0;
+                ResetLineFeedTracking();
             }
             buffer = newBuffer;
             bufferReadTillEnd = false;
@@ -344,8 +564,18 @@ public sealed partial class JsonDeserializer
             {
                 bufferPos = 0;
                 bufferFillLevel = 0;
+                ResetLineFeedTracking();
             }
             bufferStartPos = bufferPos;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ResetLineFeedTracking()
+        {
+            lastLfPos = -1;
+            lfScanPos = 0;
+            // Positions are reused for new data, so a previous value scan is no longer valid.
+            valueScanPos = valueScanStartPos = -1;
         }
 
         public void ResetBufferAfterFullSkip()

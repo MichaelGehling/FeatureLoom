@@ -81,12 +81,19 @@ is never accessed concurrently and the chunk order is preserved.
 
 ### Async deserialization from streams
 
-`TryDeserializeAsync<T>()` awaits the start of the next value asynchronously. The parsing itself
-then runs on the calling thread without further awaits, in parallel to one background `ReadAsync`
-that fills the free part of the buffer (read-ahead). The parser only blocks if it catches up with
-that read, i.e. if the stream is slower than parsing. A larger
-`initialBufferSize` leaves more room for read-ahead. `IsAnyDataLeftAsync()` completes synchronously
-when a value is already buffered. The synchronous API is unaffected.
+`TryDeserializeAsync<T>()` asynchronously awaits until the complete next value is buffered, then
+parses it synchronously on the calling thread. So the parser never blocks on stream I/O. Completeness
+is detected by a cheap vectorized pre-scan: line feeds for `InputFormat.JsonLines`, otherwise a
+structural scan (strings/escapes, brackets, primitive delimiters). The buffer grows up front for large
+values, so no re-parse after `BufferExceeded` is needed. One background `ReadAsync` (read-ahead) fills
+the free part of the buffer in parallel. `IsAnyDataLeftAsync(ensureFullValue: true)` provides the same
+guarantee for a following synchronous `TryDeserialize`. Both complete synchronously if the value is
+already buffered. The synchronous API is unaffected.
+Note: async mainly avoids blocked threads; it does not make parsing faster. A per-call overhead
+remains (task allocation, pre-scan, async reads): measured with a simulated slow stream, async is
+~1-7% slower than sync when I/O latency dominates and up to ~1.2-1.5x slower with zero latency.
+Read-ahead saves ~2-5% with real I/O latency. `TryDeserializeValueAsync` showed no measurable gain
+over the `Task` variant. See `DeserializeAsyncSlowStreamBenchmark`.
 
 ## String cache
 

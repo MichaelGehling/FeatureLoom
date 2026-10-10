@@ -3193,6 +3193,9 @@ public sealed partial class JsonDeserializer
         {
             if (i == ' ' || i == '\t' || i == '\n' || i == '\r') map[i] = FilterResult.Found;
             else if (i == ',' || i == ']' || i == '}' || i == ':') map[i] = FilterResult.Found;
+            // Start of a following back-to-back root value (e.g. "{...}{...}"). Same table lookup, so no extra cost.
+            // Inside objects/arrays such input still fails at the next separator check.
+            else if (i == '{' || i == '[' || i == '"') map[i] = FilterResult.Found;
             else map[i] = FilterResult.Unexpected;
         }
         return map;

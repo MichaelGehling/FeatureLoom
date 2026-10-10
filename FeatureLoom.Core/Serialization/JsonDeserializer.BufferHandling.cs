@@ -97,50 +97,106 @@ public sealed partial class JsonDeserializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private UndoReadHandle CreateUndoReadHandle(bool initUndo = true) => new UndoReadHandle(this, initUndo);
 
-    public bool IsAnyDataLeft()
+    /// <summary>
+    /// Checks whether any non-whitespace data is left in the buffer or the stream.
+    /// Blocks while waiting for stream data.
+    /// </summary>
+    /// <param name="ensureFullValue">
+    /// If true, additionally reads until the complete next value (or JSON Lines record) is buffered
+    /// or the stream has ended. Reaching the stream end still returns true, because data is left:
+    /// either a valid value that can only be recognized as complete by the stream end (e.g. a trailing
+    /// root number), or a truncated value, which the following <c>TryDeserialize</c> call reports as failure.
+    /// Mainly for symmetry with <see cref="IsAnyDataLeftAsync(bool)"/>; the benefit is lower here,
+    /// because the synchronous parser reads on demand anyway.
+    /// </param>
+    /// <returns>True if non-whitespace data is left, regardless of whether it forms a valid value.</returns>
+    public bool IsAnyDataLeft(bool ensureFullValue = false)
     {
         serializerLock.Enter();
         try
         {
-            return IsAnyDataLeftUnlocked();
+            if (!IsAnyDataLeftUnlocked()) return false;
+            if (ensureFullValue)
+            {
+                while (!IsFullValueBufferedUnlocked())
+                {
+                    buffer.EnsureFreeSpaceForLine();
+                    // Stream ended: data is still left (trailing root primitive or truncated value),
+                    // so return true and let the parser either read it or report the error.
+                    if (!buffer.TryReadFromStream()) break;
+                }
+            }
+            return true;
         }
         finally
         {
             serializerLock.Exit();
         }
     }
+
+    static readonly Task<bool> trueResultTask = Task.FromResult(true);
 
     /// <summary>
     /// Asynchronously checks whether any non-whitespace data is left in the buffer or the stream.
     /// Waits for stream data without blocking a thread.
     /// </summary>
-    public Task<bool> IsAnyDataLeftAsync()
+    /// <param name="ensureFullValue">
+    /// If true, additionally waits until the complete next value (or JSON Lines record) is buffered
+    /// or the stream has ended, so a following synchronous <c>TryDeserialize</c> call does not block on stream I/O.
+    /// Reaching the stream end still returns true, because data is left: either a valid value that can only be
+    /// recognized as complete by the stream end (e.g. a trailing root number), or a truncated value,
+    /// which the following <c>TryDeserialize</c> call reports as failure.
+    /// Recommended pattern: <c>while (await IsAnyDataLeftAsync(true)) TryDeserialize(out item);</c>.
+    /// </param>
+    /// <returns>True if non-whitespace data is left, regardless of whether it forms a valid value.</returns>
+    public Task<bool> IsAnyDataLeftAsync(bool ensureFullValue = false)
     {
-        // Fast path: a value start is already buffered, so complete synchronously without async state machine.
+        // Fast path: value start (and optionally the full value) is already buffered, so complete synchronously.
+        // Otherwise the held lock is handed over to the slow path, so it is only acquired once.
         serializerLock.Enter();
         try
         {
-            if (buffer.TrySkipBufferedWhiteSpaces()) return Task.FromResult(true);
+            if (ensureFullValue ? IsFullValueBufferedUnlocked() : buffer.TrySkipBufferedWhiteSpaces())
+            {
+                serializerLock.Exit();
+                return trueResultTask;
+            }
         }
-        finally
+        catch
         {
             serializerLock.Exit();
+            throw;
         }
-        return IsAnyDataLeftSlowAsync();
+        return IsAnyDataLeftSlowAsync(ensureFullValue);
     }
 
-    private async Task<bool> IsAnyDataLeftSlowAsync()
+    /// <summary>
+    /// Checks without any I/O whether the complete next value is buffered.
+    /// Skips buffered whitespace first, so the scan starts at the actual value start.
+    /// Must only be called between root values.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsFullValueBufferedUnlocked()
+    {
+        if (!buffer.TrySkipBufferedWhiteSpaces()) return false;
+        if (settings.jsonLines) return buffer.IsLineFeedBuffered();
+        buffer.BeginValueScan();
+        return buffer.IsValueComplete();
+    }
+
+    // Expects the serializer lock to be held by the caller (see IsAnyDataLeftAsync) and releases it.
+    private async Task<bool> IsAnyDataLeftSlowAsync(bool ensureFullValue)
     {
         // The lock must be held until the await completes, so this needs its own async method.
-        serializerLock.Enter();
         try
         {
             buffer.ReadAheadEnabled = true;
-            return await WaitForValueStartUnlockedAsync().ConfiguredAwait();
+            return await WaitForValueStartUnlockedAsync(ensureFullValue).ConfiguredAwait();
         }
         finally
         {
             buffer.ReadAheadEnabled = false;
+            buffer.ScanLineFeeds = false;
             serializerLock.Exit();
         }
     }
@@ -148,14 +204,46 @@ public sealed partial class JsonDeserializer
     /// <summary>
     /// Asynchronously waits until the start of the next value is buffered, so that parsing does not
     /// block at the beginning of a value (e.g. waiting for the next JSON Lines record).
+    /// For JSON Lines it additionally waits until the terminating line feed is buffered, so the
+    /// complete record is available and the parser never blocks (the buffer grows up front if needed).
     /// Starts a background read-ahead afterwards. Returns false if the source has no further data.
     /// </summary>
-    private async Task<bool> WaitForValueStartUnlockedAsync()
+    private async Task<bool> WaitForValueStartUnlockedAsync(bool ensureFullValue)
     {
         while (!buffer.TrySkipBufferedWhiteSpaces())
         {
             if (!await buffer.TryReadFromStreamAsync().ConfiguredAwait()) return false;
         }
+
+        if (!ensureFullValue) { }
+        else if (settings.jsonLines)
+        {
+            buffer.ScanLineFeeds = true;
+            while (!buffer.IsLineFeedBuffered())
+            {
+                buffer.EnsureFreeSpaceForLine();
+                // End of stream: the last record has no terminator, the parser handles the rest.
+                if (!await buffer.TryReadFromStreamAsync().ConfiguredAwait()) break;
+            }
+        }
+        else
+        {
+            // Same idea for any other input: a structural scan detects the end of the root value.
+            buffer.BeginValueScan();
+            while (!buffer.IsValueComplete())
+            {
+                buffer.EnsureFreeSpaceForLine();
+                if (!await buffer.TryReadFromStreamAsync().ConfiguredAwait()) break;
+            }
+        }
+
+        // Compact now (after the pending read is awaited) instead of blocking in the parser.
+        if (buffer.NeedsCompaction)
+        {
+            if (buffer.HasPendingRead) await buffer.TryReadFromStreamAsync().ConfiguredAwait();
+            buffer.ResetBuffer(true, false);
+        }
+
         buffer.StartReadAhead();
         return true;
     }
