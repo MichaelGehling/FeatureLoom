@@ -21,6 +21,11 @@ namespace FeatureLoom.Helpers
                 new object[] { typeof(Dictionary<int, List<string>>) },
                 new object[] { typeof(List<int>[]) },
                 new object[] { typeof(Dictionary<string, object>[]) },
+                new object[] { typeof(int[,]) },
+                new object[] { typeof(string[,,]) },
+                new object[] { typeof(int[][,]) },
+                new object[] { typeof(int[,][]) },
+                new object[] { typeof(List<int[,]>) },
             };
 
         [Theory]
@@ -46,6 +51,8 @@ namespace FeatureLoom.Helpers
             Assert.Equal("System.Collections.Generic.Dictionary<System.String, System.Object>", TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(Dictionary<string, object>)));
             Assert.Equal("System.Int32[]", TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(int[])));
             Assert.Equal("System.Collections.Generic.List<System.String>[]", TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(List<string>[])));
+            Assert.Equal("System.Int32[,]", TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(int[,])));
+            Assert.Equal("System.Int32[,,]", TypeNameHelper.Shared.GetSimplifiedTypeName(typeof(int[,,])));
         }
 
         [Fact]

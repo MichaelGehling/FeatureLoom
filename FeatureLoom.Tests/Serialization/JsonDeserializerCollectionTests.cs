@@ -31,6 +31,106 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
+        public void Deserialize_IntArray2D()
+        {
+            var value = Deserialize<int[,]>("[[1,2,3],[4,5,6]]");
+            Assert.Equal(new int[,] { { 1, 2, 3 }, { 4, 5, 6 } }, value);
+        }
+
+        [Fact]
+        public void Deserialize_StringArray3D()
+        {
+            var value = Deserialize<string[,,]>("[[[\"a\",null]],[[\"b\",\"c\"]]]");
+            Assert.Equal(new string[2, 1, 2] { { { "a", null } }, { { "b", "c" } } }, value);
+        }
+
+        [Fact]
+        public void Deserialize_IntArray2D_EmptyAndNull()
+        {
+            var empty = Deserialize<int[,]>("[]");
+            Assert.Equal(0, empty.GetLength(0));
+            Assert.Equal(0, empty.GetLength(1));
+            var emptyRows = Deserialize<int[,]>("[[],[]]");
+            Assert.Equal(2, emptyRows.GetLength(0));
+            Assert.Equal(0, emptyRows.GetLength(1));
+            Assert.Null(Deserialize<int[,]>("null"));
+        }
+
+        [Fact]
+        public void Deserialize_IntArray2D_Jagged_Fails()
+        {
+            var deserializer = new JsonDeserializer();
+            Assert.False(deserializer.TryDeserialize("[[1,2],[3]]", out int[,] _));
+        }
+
+        [Fact]
+        public void Roundtrip_IntArray2D_AsField()
+        {
+            var original = new MultiDimHolder { grid = new int[,] { { 1, 2 }, { 3, 4 }, { 5, 6 } } };
+            string json = new JsonSerializer().Serialize(original);
+            var value = Deserialize<MultiDimHolder>(json);
+            Assert.Equal(original.grid, value.grid);
+        }
+
+        public class MultiDimHolder
+        {
+            public int[,] grid;
+        }
+
+        public class GridCell
+        {
+            public string name;
+            public int value;
+        }
+
+        public struct GridPoint
+        {
+            public int x;
+            public int y;
+        }
+
+        [Fact]
+        public void Deserialize_ClassArray2D_WithNull()
+        {
+            var value = Deserialize<GridCell[,]>("[[{\"name\":\"a\",\"value\":1},null],[{\"name\":\"b\",\"value\":2},{\"name\":\"c\",\"value\":3}]]");
+            Assert.Equal(2, value.GetLength(0));
+            Assert.Equal(2, value.GetLength(1));
+            Assert.Equal("a", value[0, 0].name);
+            Assert.Equal(1, value[0, 0].value);
+            Assert.Null(value[0, 1]);
+            Assert.Equal("b", value[1, 0].name);
+            Assert.Equal(3, value[1, 1].value);
+        }
+
+        [Fact]
+        public void Roundtrip_StructArray3D()
+        {
+            var original = new GridPoint[2, 2, 1];
+            for (int i = 0; i < 2; i++)
+                for (int j = 0; j < 2; j++)
+                    original[i, j, 0] = new GridPoint { x = i, y = j * 10 };
+            string json = new JsonSerializer().Serialize(original);
+            var value = Deserialize<GridPoint[,,]>(json);
+            Assert.Equal(original, value);
+        }
+
+        [Fact]
+        public void Roundtrip_ClassArray2D_AsObjectField_WithTypeInfo()
+        {
+            var original = new ObjectHolder { content = new GridCell[,] { { new GridCell { name = "x", value = 7 } } } };
+            string json = new JsonSerializer().Serialize(original);
+            var value = Deserialize<ObjectHolder>(json);
+            var grid = Assert.IsType<GridCell[,]>(value.content);
+            Assert.Equal("x", grid[0, 0].name);
+            Assert.Equal(7, grid[0, 0].value);
+        }
+
+        public class ObjectHolder
+        {
+            public object content;
+        }
+
+        [Fact]
         public void Deserialize_StringArray_WithNull()
         {
             var value = Deserialize<string[]>("[\"a\",null,\"b\"]");

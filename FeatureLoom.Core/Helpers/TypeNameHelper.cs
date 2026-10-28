@@ -110,7 +110,8 @@ namespace FeatureLoom.Helpers
             string typeName;
             if (type.IsArray)
             {
-                typeName = LockedGetSimplifiedTypeName(type.GetElementType()) + "[]";
+                int rank = type.GetArrayRank();
+                typeName = LockedGetSimplifiedTypeName(type.GetElementType()) + (rank == 1 ? "[]" : "[" + new string(',', rank - 1) + "]");
             }
             else if (type.IsGenericType)
             {
@@ -128,14 +129,28 @@ namespace FeatureLoom.Helpers
             return typeName;
         }
 
+        private static bool TryGetArraySuffixRank(string typeName, out int rank, out int bracketIndex)
+        {
+            rank = 0;
+            bracketIndex = -1;
+            if (typeName.Length < 3 || typeName[typeName.Length - 1] != ']') return false;
+            int i = typeName.Length - 2;
+            while (i >= 0 && typeName[i] == ',') i--;
+            if (i < 1 || typeName[i] != '[') return false;
+            bracketIndex = i;
+            rank = typeName.Length - 1 - i;
+            return true;
+        }
+
         private Type LockedGetTypeFromSimplifiedName(string typeName)
         {
             Type type;
-            if (typeName.EndsWith("[]"))
+            if (TryGetArraySuffixRank(typeName, out int rank, out int bracketIndex))
             {
-                // It's an array type
-                var elementType = LockedGetTypeFromSimplifiedName(typeName.Substring(0, typeName.Length - 2));
-                type = elementType?.MakeArrayType();
+                // It's an array type ("[]" for single dimensional, "[,]", "[,,]", ... for multi-dimensional)
+                var elementType = LockedGetTypeFromSimplifiedName(typeName.Substring(0, bracketIndex));
+                // MakeArrayType(1) would create a non-zero-based "T[*]" type, so rank 1 must use MakeArrayType().
+                type = elementType == null ? null : rank == 1 ? elementType.MakeArrayType() : elementType.MakeArrayType(rank);
             }
             else if (typeName.Contains("<") && typeName.Contains(">"))
             {

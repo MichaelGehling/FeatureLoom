@@ -2031,6 +2031,10 @@ public sealed partial class JsonDeserializer
         {
             return CreateByteArrayTypeReader(cachedTypeReader);
         }
+        else if (arrayType.GetArrayRank() > 1)
+        {
+            return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateMultiDimArrayTypeReader), new Type[] { arrayType, arrayType.GetElementType() }, cachedTypeReader);
+        }
         else if (!cachedTypeReader.ResolveRefs &&
                  GetElementSettings(arrayType.GetElementType(), cachedTypeReader.TypeSettings) == null &&                 
                  TryCreateNumberContainerReader(arrayType.GetElementType(), false, cachedTypeReader, out var integerInitializer))
@@ -2042,6 +2046,88 @@ public sealed partial class JsonDeserializer
             return this.InvokeGenericMethod<TypeReaderInitializer>(nameof(CreateGenericArrayTypeReader), new Type[] { arrayType.GetElementType() }, cachedTypeReader);
         }
     }
+
+    /// <summary>
+    /// Creates a reader for multi-dimensional arrays (e.g. int[,]), which are represented as nested JSON arrays.
+    /// The JSON is read via the reader of the equivalent jagged array type (e.g. int[][]) and then copied
+    /// into the rectangular array. Non-rectangular input fails.
+    /// </summary>
+    private TypeReaderInitializer CreateMultiDimArrayTypeReader<T, E>(CachedTypeReader cachedTypeReader) where T : class
+    {
+        int rank = typeof(T).GetArrayRank();
+        Type jaggedType = typeof(E);
+        for (int i = 0; i < rank; i++) jaggedType = jaggedType.MakeArrayType();
+        CachedTypeReader jaggedReader = null;
+#if NET6_0_OR_GREATER
+        Action<Array, int[], E> setElement = null;
+#else
+        // Typed setter avoiding the boxing of Array.SetValue, compiled once per reader.
+        var arrayParam = Expression.Parameter(typeof(Array));
+        var indicesParam = Expression.Parameter(typeof(int[]));
+        var valueParam = Expression.Parameter(typeof(E));
+        var indexExpressions = new Expression[rank];
+        for (int d = 0; d < rank; d++) indexExpressions[d] = Expression.ArrayIndex(indicesParam, Expression.Constant(d));
+        var access = Expression.ArrayAccess(Expression.Convert(arrayParam, typeof(T)), indexExpressions);
+        Action<Array, int[], E> setElement = Expression.Lambda<Action<Array, int[], E>>(Expression.Assign(access, valueParam), arrayParam, indicesParam, valueParam).Compile();
+#endif
+
+        var reader = () =>
+        {
+            if (TryReadNullValue()) return default;
+            if (jaggedReader == null) jaggedReader = GetCachedTypeReader(jaggedType, cachedTypeReader.TypeSettings);
+            Array jagged = jaggedReader.ReadValue_IgnoreProposed<object>() as Array;
+            if (jagged == null) return default;
+
+            int[] lengths = new int[rank];
+            Array level = jagged;
+            for (int d = 0; d < rank; d++)
+            {
+                lengths[d] = level.Length;
+                if (d + 1 < rank) level = level.Length > 0 ? (Array)level.GetValue(0) : null;
+                if (level == null) break;
+            }
+
+            Array result = Array.CreateInstance(typeof(E), lengths);
+            int[] indices = new int[rank];
+            int flatIndex = 0;
+            CopyJaggedToMultiDim<E>(jagged, result, lengths, indices, 0, ref flatIndex, setElement);
+            return (T)(object)result;
+        };
+
+        return TypeReaderInitializer.Create(this, reader, null, false, cachedTypeReader.TypeSettings);
+    }
+
+    /// <summary>
+    /// Copies the jagged source into the rectangular target without boxing: on .NET 6+ each leaf row is
+    /// block-copied into the contiguous array data, otherwise the compiled multi-index setter is used
+    /// (<paramref name="setElement"/> is null and unused on .NET 6+).
+    /// </summary>
+    private static void CopyJaggedToMultiDim<E>(Array source, Array target, int[] lengths, int[] indices, int dimension, ref int flatIndex, Action<Array, int[], E> setElement)
+    {
+        if (source == null || source.Length != lengths[dimension]) throw new Exception("Failed reading multi-dimensional Array: input is not rectangular");
+        if (dimension == lengths.Length - 1)
+        {
+            E[] leaf = (E[])source;
+#if NET6_0_OR_GREATER
+            ref E first = ref System.Runtime.CompilerServices.Unsafe.As<byte, E>(ref MemoryMarshal.GetArrayDataReference(target));
+            leaf.AsSpan().CopyTo(MemoryMarshal.CreateSpan(ref System.Runtime.CompilerServices.Unsafe.Add(ref first, flatIndex), leaf.Length));
+#else
+            for (int i = 0; i < leaf.Length; i++)
+            {
+                indices[dimension] = i;
+                setElement(target, indices, leaf[i]);
+            }
+#endif
+            flatIndex += leaf.Length;
+            return;
+        }
+        for (int i = 0; i < source.Length; i++)
+        {
+            indices[dimension] = i;
+            CopyJaggedToMultiDim<E>((Array)source.GetValue(i), target, lengths, indices, dimension + 1, ref flatIndex, setElement);
+        }
+    }
+
 
     /// <summary>
     /// Creates a reader that uses the shared number bulk parser for the given element type, either

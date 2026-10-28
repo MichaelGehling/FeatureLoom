@@ -35,6 +35,69 @@ namespace FeatureLoom.Serialization
         }
 
         [Fact]
+        public void Serialize_IntArray2D()
+        {
+            var value = new int[,] { { 1, 2, 3 }, { 4, 5, 6 } };
+            AssertSerialized(value, "[[1,2,3],[4,5,6]]");
+        }
+
+        [Fact]
+        public void Serialize_StringArray3D()
+        {
+            var value = new string[2, 1, 2] { { { "a", null } }, { { "b", "c" } } };
+            AssertSerialized(value, "[[[\"a\",null]],[[\"b\",\"c\"]]]");
+        }
+
+        [Fact]
+        public void Serialize_IntArray2D_Empty()
+        {
+            AssertSerialized(new int[0, 0], "[]");
+            AssertSerialized(new int[2, 0], "[[],[]]");
+        }
+
+        [Fact]
+        public void Serialize_IntArray2D_AsField()
+        {
+            var value = new MultiDimHolder { grid = new int[,] { { 1 }, { 2 } } };
+            AssertSerialized(value, "{\"grid\":[[1],[2]]}");
+        }
+
+        public class MultiDimHolder
+        {
+            public int[,] grid;
+        }
+
+        public class GridCell
+        {
+            public string name;
+            public int value;
+        }
+
+        public struct GridPoint
+        {
+            public int x;
+            public int y;
+        }
+
+        [Fact]
+        public void Serialize_ClassArray2D_WithNull()
+        {
+            var value = new GridCell[,]
+            {
+                { new GridCell { name = "a", value = 1 }, null },
+                { new GridCell { name = "b", value = 2 }, new GridCell { name = "c", value = 3 } }
+            };
+            AssertSerialized(value, "[[{\"name\":\"a\",\"value\":1},null],[{\"name\":\"b\",\"value\":2},{\"name\":\"c\",\"value\":3}]]");
+        }
+
+        [Fact]
+        public void Serialize_StructArray2D()
+        {
+            var value = new GridPoint[,] { { new GridPoint { x = 1, y = 2 } }, { new GridPoint { x = 3, y = 4 } } };
+            AssertSerialized(value, "[[{\"x\":1,\"y\":2}],[{\"x\":3,\"y\":4}]]");
+        }
+
+        [Fact]
         public void Serialize_StringArray_WithNull()
         {
             var value = new[] { "a", null, "b" };
