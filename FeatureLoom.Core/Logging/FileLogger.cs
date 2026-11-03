@@ -180,27 +180,18 @@ namespace FeatureLoom.Logging
 
                 if (config.compressedArchive)
                 {
-                    using (var fileStream = new FileStream(archiveInfo.FullName, FileMode.OpenOrCreate))
+                    try
                     {
-                        using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
-                        {
-                            archive.CreateEntryFromFile(logFileInfo.FullName, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
-                        }
-
-                        using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
-                        {
-                            List<ZipArchiveEntry> entries = new List<ZipArchiveEntry>(archive.Entries);
-                            entries.Sort(nameComparer);
-                            long overallLength = 0;
-                            foreach (var entry in entries)
-                            {
-                                if (overallLength > (long)config.logFilesArchiveLimitInMB * 1024 * 1024)
-                                {
-                                    entry.Delete();
-                                }
-                                else overallLength += entry.CompressedLength;
-                            }
-                        }
+                        AddToCompressedArchive(logFileInfo, archiveInfo);
+                    }
+                    catch (InvalidDataException e)
+                    {
+                        // The archive is corrupted (e.g. invalid central directory). Without removing it, every
+                        // subsequent archiving attempt would fail again and flood the log with exceptions.
+                        OptLog.WARNING(this.GetType().Name + this.GetHandle().ToString())?.Build($"Log archive file {archiveInfo.FullName} is corrupted and will be deleted.", e);
+                        archiveInfo.Refresh();
+                        if (archiveInfo.Exists) archiveInfo.Delete();
+                        AddToCompressedArchive(logFileInfo, archiveInfo);
                     }
                     logFileInfo.Delete();
                 }
@@ -216,6 +207,32 @@ namespace FeatureLoom.Logging
                     CleanupUncompressedArchiveFiles();
                 }
             });
+        }
+
+        private void AddToCompressedArchive(FileInfo logFileInfo, FileInfo archiveInfo)
+        {
+            using (var fileStream = new FileStream(archiveInfo.FullName, FileMode.OpenOrCreate))
+            {
+                using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
+                {
+                    archive.CreateEntryFromFile(logFileInfo.FullName, logFileInfo.CreationTime.ToString("yyyy-MM-dd_HH-mm-ss") + " until " + logFileInfo.LastWriteTime.ToString("yyyy-MM-dd_HH-mm-ss") + ".txt", config.compressionLevel);
+                }
+
+                using (var archive = new ZipArchive(fileStream, ZipArchiveMode.Update, true))
+                {
+                    List<ZipArchiveEntry> entries = new List<ZipArchiveEntry>(archive.Entries);
+                    entries.Sort(nameComparer);
+                    long overallLength = 0;
+                    foreach (var entry in entries)
+                    {
+                        if (overallLength > (long)config.logFilesArchiveLimitInMB * 1024 * 1024)
+                        {
+                            entry.Delete();
+                        }
+                        else overallLength += entry.CompressedLength;
+                    }
+                }
+            }
         }
 
         private void CleanupUncompressedArchiveFiles()
