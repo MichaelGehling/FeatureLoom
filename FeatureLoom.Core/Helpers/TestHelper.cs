@@ -26,7 +26,7 @@ namespace FeatureLoom.Helpers
             /// <summary>
             /// Lock for synchronizing access to context data.
             /// </summary>
-            public FeatureLock contextLock = new FeatureLock();
+            public MicroLock contextLock = new();
 
             /// <summary>
             /// List of captured log messages with level ERROR.
