@@ -15,11 +15,15 @@ public readonly struct LogEntryInfo
     /// <summary>Flag bits, including <see cref="LogReservedFlags"/>.</summary>
     public ulong Flags { get; }
 
-    public LogEntryInfo(LogEntryId id, DateTime timestamp, ulong flags)
+    /// <summary>Id of the payload type (see <see cref="LogPayloadTypeRegistry"/>).</summary>
+    public ushort TypeId { get; }
+
+    public LogEntryInfo(LogEntryId id, DateTime timestamp, ulong flags, ushort typeId = 0)
     {
         Id = id;
         Timestamp = timestamp;
         Flags = flags;
+        TypeId = typeId;
     }
 
     /// <summary>True if the entry is flagged as deleted.</summary>
@@ -42,20 +46,82 @@ public readonly struct LogEntry<T>
     }
 }
 
-/// <summary>Index values supplied when appending an entry. Custom field values are given by field name.</summary>
-public sealed class LogAppendInfo
+/// <summary>
+/// Index metadata of one entry, derived from the payload by its <see cref="LogPayloadType{T}"/>.
+/// Writer-owned scratch object: filled per append and copied into the write buffer, never exposed to callers for writing.
+/// </summary>
+public sealed class LogEntryMetadata
 {
-    /// <summary>Timestamp (UTC). If null, the current time is used.</summary>
-    public DateTime? Timestamp { get; set; }
+    private readonly ulong[] fieldValues;
+    private readonly string[] fieldSources;
 
-    /// <summary>Names of user-defined flags to set.</summary>
-    public IReadOnlyList<string> Flags { get; set; }
+    /// <summary>Creates metadata storage matching <paramref name="schema"/>.</summary>
+    public LogEntryMetadata(LogIndexSchema schema)
+    {
+        Schema = schema ?? throw new ArgumentNullException(nameof(schema));
+        fieldValues = schema.Fields.Count == 0 ? Array.Empty<ulong>() : new ulong[schema.Fields.Count];
+        fieldSources = schema.Fields.Count == 0 ? Array.Empty<string>() : new string[schema.Fields.Count];
+    }
 
-    /// <summary>Raw values for Raw/Ascending/Descending fields.</summary>
-    public IReadOnlyDictionary<string, ulong> FieldValues { get; set; }
+    /// <summary>Schema this metadata belongs to.</summary>
+    public LogIndexSchema Schema { get; }
 
-    /// <summary>Source values for Hash/Handle fields.</summary>
-    public IReadOnlyDictionary<string, string> FieldSources { get; set; }
+    /// <summary>Timestamp (UTC).</summary>
+    public DateTime Timestamp { get; set; }
+
+    /// <summary>Flag bits (user flags only; reserved bits are managed by the storage).</summary>
+    public ulong Flags { get; set; }
+
+    /// <summary>Payload type id.</summary>
+    public ushort TypeId { get; set; }
+
+    /// <summary>Sets the raw value of a Raw/Ascending/Descending field.</summary>
+    public void SetValue(int fieldIndex, ulong value) => fieldValues[fieldIndex] = value;
+
+    /// <summary>Sets the source value of a Hash/Handle field.</summary>
+    public void SetSource(int fieldIndex, string source) => fieldSources[fieldIndex] = source;
+
+    /// <summary>Raw value of a field.</summary>
+    public ulong GetValue(int fieldIndex) => fieldValues[fieldIndex];
+
+    /// <summary>Source value of a field (null if not set).</summary>
+    public string GetSource(int fieldIndex) => fieldSources[fieldIndex];
+
+    /// <summary>Resets all values for reuse.</summary>
+    public void Clear()
+    {
+        Timestamp = default;
+        Flags = 0;
+        TypeId = 0;
+        Array.Clear(fieldValues, 0, fieldValues.Length);
+        Array.Clear(fieldSources, 0, fieldSources.Length);
+    }
+}
+
+/// <summary>Filter on a single custom field, addressed by field index.</summary>
+public readonly struct LogFieldFilter
+{
+    /// <summary>Index of the field in the schema.</summary>
+    public int FieldIndex { get; }
+
+    /// <summary>Raw value to match (Raw/Ascending/Descending fields).</summary>
+    public ulong Value { get; }
+
+    /// <summary>Source value to match (Hash/Handle fields). Null for raw matches.</summary>
+    public string Source { get; }
+
+    private LogFieldFilter(int fieldIndex, ulong value, string source)
+    {
+        FieldIndex = fieldIndex;
+        Value = value;
+        Source = source;
+    }
+
+    /// <summary>Matches the raw field value.</summary>
+    public static LogFieldFilter ValueEquals(int fieldIndex, ulong value) => new LogFieldFilter(fieldIndex, value, null);
+
+    /// <summary>Matches the source value of a Hash/Handle field.</summary>
+    public static LogFieldFilter SourceEquals(int fieldIndex, string source) => new LogFieldFilter(fieldIndex, 0, source ?? throw new ArgumentNullException(nameof(source)));
 }
 
 /// <summary>Filter criteria for querying a log. All set criteria must match.</summary>
@@ -73,11 +139,11 @@ public sealed class LogQuery
     /// <summary>Flag bits that must all be unset. Deleted entries are excluded by default.</summary>
     public ulong ExcludedFlags { get; set; } = LogReservedFlags.Deleted;
 
-    /// <summary>Exact field matches on raw values, by field name.</summary>
-    public IReadOnlyDictionary<string, ulong> FieldEquals { get; set; }
+    /// <summary>Field filters; all must match.</summary>
+    public IReadOnlyList<LogFieldFilter> FieldFilters { get; set; }
 
-    /// <summary>Exact field matches on source values (Hash/Handle fields), by field name.</summary>
-    public IReadOnlyDictionary<string, string> FieldSourceEquals { get; set; }
+    /// <summary>Payload type ids to include. Null means all (payload queries for <c>T</c> restrict this to the type of <c>T</c>).</summary>
+    public IReadOnlyList<ushort> TypeIds { get; set; }
 
     /// <summary>Return newest entries first.</summary>
     public bool Reverse { get; set; }

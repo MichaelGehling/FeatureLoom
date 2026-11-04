@@ -48,7 +48,7 @@ public static class LogReservedFlags
 
 /// <summary>
 /// Layout of the fixed-size index records of a log. Defined at log creation and stored in every index file header.
-/// Record layout: [time offset 4 B][position 4|8 B][flags 1|2|4|8 B][custom fields in definition order]. No padding.
+/// Record layout: [time offset 4 B][position 4|8 B][flags 1|2|4|8 B][type id 0|1|2 B][custom fields in definition order]. No padding.
 /// </summary>
 public sealed class LogIndexSchema
 {
@@ -89,6 +89,15 @@ public sealed class LogIndexSchema
     /// <summary>Size of the flag field in bytes (1, 2, 4 or 8).</summary>
     public int FlagSize { get; }
 
+    /// <summary>Size of the payload type id in bytes (0 = single payload type with id 0, 1 or 2).</summary>
+    public int TypeIdSize { get; }
+
+    /// <summary>Byte offset of the type id within an index record.</summary>
+    public int TypeIdOffset => TimeSize + (int)PositionSize + FlagSize;
+
+    /// <summary>Largest payload type id that fits into <see cref="TypeIdSize"/>.</summary>
+    public ushort MaxTypeId => TypeIdSize == 0 ? (ushort)0 : TypeIdSize == 1 ? byte.MaxValue : ushort.MaxValue;
+
     /// <summary>Total size of one index record in bytes.</summary>
     public int RecordSize { get; }
 
@@ -102,13 +111,15 @@ public sealed class LogIndexSchema
     /// <param name="positionSize">Size of the position field.</param>
     /// <param name="headerMode">Header mode of segment records.</param>
     /// <param name="framing">Record framing of segment files.</param>
+    /// <param name="typeIdSize">Size of the payload type id (0, 1 or 2 bytes). Use 0 if the log holds a single payload type.</param>
     /// <exception cref="ArgumentException">The combination is invalid.</exception>
     public LogIndexSchema(IEnumerable<string> flagNames = null,
                           IEnumerable<LogFieldDefinition> fields = null,
                           TimeSpan? timeResolution = null,
                           LogPositionSize positionSize = LogPositionSize.Bytes4,
                           LogHeaderMode headerMode = LogHeaderMode.Full,
-                          LogRecordFraming framing = LogRecordFraming.Binary)
+                          LogRecordFraming framing = LogRecordFraming.Binary,
+                          int typeIdSize = 0)
     {
         this.flagNames = flagNames != null ? new List<string>(flagNames).ToArray() : Array.Empty<string>();
         this.fields = fields != null ? new List<LogFieldDefinition>(fields).ToArray() : Array.Empty<LogFieldDefinition>();
@@ -116,6 +127,8 @@ public sealed class LogIndexSchema
         PositionSize = positionSize;
         HeaderMode = headerMode;
         Framing = framing;
+        if (typeIdSize < 0 || typeIdSize > 2) throw new ArgumentOutOfRangeException(nameof(typeIdSize), typeIdSize, "Type id size must be 0, 1 or 2.");
+        TypeIdSize = typeIdSize;
 
         Validate();
 
@@ -123,7 +136,7 @@ public sealed class LogIndexSchema
         FlagSize = totalFlags <= 8 ? 1 : totalFlags <= 16 ? 2 : totalFlags <= 32 ? 4 : 8;
 
         fieldOffsets = new int[this.fields.Length];
-        int offset = TimeSize + (int)PositionSize + FlagSize;
+        int offset = TimeSize + (int)PositionSize + FlagSize + TypeIdSize;
         for (int i = 0; i < this.fields.Length; i++)
         {
             fieldOffsets[i] = offset;
@@ -154,7 +167,7 @@ public sealed class LogIndexSchema
             if (field == null) throw new ArgumentException("Field definitions must not be null.", "fields");
             if (!fieldSet.Add(field.Name)) throw new ArgumentException($"Duplicate field name '{field.Name}'.", "fields");
             // Hash matches and overflow handles must be verified against the source value, which only the full header stores.
-            // Payload field extractors (planned) will relax this rule.
+            // Verifying via the payload type's source extractor instead could relax this rule later.
             if (HeaderMode != LogHeaderMode.Full && (field.Kind == LogFieldKind.Hash || field.Kind == LogFieldKind.Handle))
                 throw new ArgumentException($"Field '{field.Name}' of kind {field.Kind} requires header mode {LogHeaderMode.Full}.", "fields");
         }

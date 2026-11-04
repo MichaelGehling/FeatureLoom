@@ -39,6 +39,31 @@
   - Cross-log queries via a runtime `MultiLogReader`: runs the query per log (each resolving its own lookup tables/handles), then merges results by index timestamp (k-way merge) or concatenates, depending on the query. Continuation token holds a position per log.
   - Logs in one merged query may have different schemas; filters referring to a field missing in a log exclude (or optionally ignore) that log.
 
+## Prepared payload types
+- Payload types are prepared in a `LogPayloadTypeRegistry` (explicitly, or implicitly on first use, see below); with implicit types disabled, `Append<T>` of an unprepared type throws. Exact CLR type match, no base-type fallback.
+- `LogPayloadType<T>(codec = null, name = null)` configures index metadata via Funcs or constants (default codec: `JsonLogEntryCodec<T>`, compact FeatureLoom JSON): `Timestamp(Func)` (optional, default = write time UTC), `Flag(name, predicate)` / `Flag(name)`, `Field(name, Func<T,ulong>)` / `Field(name, ulong)` for Raw/Ascending/Descending, `Field(name, Func<T,string>)` / `Field(name, string)` for Hash/Handle. Unconfigured fields are 0/null.
+- Implicit types: with `allowImplicitTypes` (default true) the writer resolves types via `GetOrRegister<T>()`, which registers unknown types on first use with JSON codec, default name and no fields/flags. Set it to false to enforce explicit preparation. Registry lookups are lock-free (copy-on-write dictionaries).
+- Type ids are not user-defined: the name (default = `TypeNameHelper` simplified type name; set explicitly to survive CLR renames) is mapped to an id via `LogPayloadTypeMap` (`types.map` in the log folder, CRC-protected, written atomically via temp+replace before the first entry with a new id). Ids are assigned sequentially and never reused.
+- Registration validates names, field kinds and type id range against the schema, resolves names to index/mask arrays and freezes the definition (no lookups on append).
+- Multiple types per log: the schema's `TypeIdSize` (0/1/2 B) stores the type id in each index record; the Full record header also stores it (u16) for index rebuild. Readers select the codec by type id; `QueryAsync<T>` returns only entries of `T`'s type.
+- `LogAppendInfo` removed; the writer owns a reusable `LogEntryMetadata` scratch object.
+
+## Schema evolution
+- Adding a field/flag to a payload type that already exists in the schema: no schema change. Older entries keep 0/null in that slot (no backfill); filters on it don't match them unless 0/null matches. The type id stays the same (bound to the name).
+- Registering a type with fields/flags not in the current schema: behavior depends on `SchemaGrowth` (below). With growth enabled, the writer derives a new schema (existing fields/flags keep their order, kind and size; new ones are appended) and triggers a rollover; the new segment's `.idx` header carries the new schema.
+- The schema changes only at rollover. Changing a field's kind or size, reordering, or removing a field/flag is likewise a new schema and only takes effect at rollover; it never rewrites existing segments.
+- The current schema is persisted in the log folder (atomic write, like `types.map`) before the first entry of the new segment, so reopening the log continues with the evolved schema.
+- Readers use the schema of each segment. In queries across segments, a filter on a field that is missing in a segment excludes that segment (or optionally ignores the filter), the same rule as for logs with different schemas.
+- Flag/type-id width growth (more flags than the current width, more types than `TypeIdSize` allows) is also a schema change and handled the same way.
+- `SchemaGrowth` option (per log): `Disabled` (default; registration of a type whose fields/flags are not a subset of the schema throws, schema only changes by explicit reconfiguration at rollover), `Append` (dynamic growth as above; useful for prototyping and evolving applications without deleting old logs). Optional `ShrinkAtRollover` (with `Append`): at rollover rebuild the schema from currently registered types only, dropping unused fields/flags.
+- Caveats:
+  - Field identity is the name: renaming a field creates a new field; queries on the new name miss old segments unless an alias (old name -> new name) is configured.
+  - Changing kind or size under the same name: readers always interpret values with the segment's own field definition; filters are evaluated per segment.
+  - Old segments never contain values for added fields; they are only reachable via time, type and shared fields. Possible later extension: reindex job for old segments if the payload contains the value.
+  - Type renames create a new type id; set explicit type names once leaving prototyping.
+  - With `Append` and a fresh log, the initial layout depends on registration order; production setups should declare the schema upfront.
+- Status: designed only; writer/reader implementation pending.
+
 ## Archiving & backup
 Goal: backup/archive = plain file copy/move of segment + index files (+ lookup table + schema).
 - **Self-describing files**: each `.idx` header carries schema, reference time, segment sequence and log id; segment file names include sequence and start time (`<name>.<seq>.<yyyyMMddHHmmss>.log`) → no name collisions when archives from different times are combined.
