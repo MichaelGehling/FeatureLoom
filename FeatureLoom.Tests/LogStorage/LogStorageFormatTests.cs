@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using FeatureLoom.LogStorage;
@@ -112,6 +112,68 @@ public class LogStorageFormatTests
         var bytes = new LogIndexFileHeader(CreateSchema(), 1, DateTime.UtcNow, false).ToBytes();
         Assert.Throws<InvalidDataException>(() => LogIndexFileHeader.Read(new MemoryStream(bytes, 0, bytes.Length - 1)));
     }
+
+	[Fact]
+	public void IndexHeader_RoundTripsLogId()
+	{
+		var logId = Guid.NewGuid();
+		var read = LogIndexFileHeader.Parse(new LogIndexFileHeader(CreateSchema(), 1, DateTime.UtcNow, false, logId).ToBytes());
+		Assert.Equal(logId, read.LogId);
+	}
+
+	[Fact]
+	public void SchemaFile_RoundTrips()
+	{
+		var schema = new LogIndexSchema(
+			flagNames: new[] { "error" },
+			fields: new[] { new LogFieldDefinition("level", LogFieldKind.Raw, 1), new LogFieldDefinition("user", LogFieldKind.Hash, 4) },
+			typeIdSize: 2);
+		var logId = Guid.NewGuid();
+		var read = LogSchemaFile.Parse(LogSchemaFile.ToBytes(schema, logId), out var readId);
+
+		Assert.Equal(logId, readId);
+		Assert.Equal(schema.RecordSize, read.RecordSize);
+		Assert.Equal(schema.FlagNames, read.FlagNames);
+		Assert.Equal(2, read.TypeIdSize);
+		Assert.Equal("user", read.Fields[1].Name);
+		Assert.Equal(LogFieldKind.Hash, read.Fields[1].Kind);
+	}
+
+	[Fact]
+	public void SchemaFile_DetectsCorruptionAndTruncation()
+	{
+		var bytes = LogSchemaFile.ToBytes(CreateSchema(), Guid.NewGuid());
+		var corrupt = (byte[])bytes.Clone();
+		corrupt[corrupt.Length / 2] ^= 0x01;
+		Assert.Throws<InvalidDataException>(() => LogSchemaFile.Parse(corrupt, out _));
+		var truncated = new byte[bytes.Length - 1];
+		Array.Copy(bytes, truncated, truncated.Length);
+		Assert.Throws<InvalidDataException>(() => LogSchemaFile.Parse(truncated, out _));
+	}
+
+	[Fact]
+	public void SchemaFile_WritesLoadsAndReplaces()
+	{
+		string dir = Path.Combine(Path.GetTempPath(), "FeatureLoomSchemaFile_" + Guid.NewGuid().ToString("N"));
+		Directory.CreateDirectory(dir);
+		try
+		{
+			var logId = Guid.NewGuid();
+			Assert.False(LogSchemaFile.TryLoad(dir, out _, out _));
+			LogSchemaFile.Write(dir, CreateSchema(), logId);
+			var grown = new LogIndexSchema(flagNames: new[] { "error", "audit", "new" }, fields: new[] { new LogFieldDefinition("level", LogFieldKind.Raw, 1) });
+			LogSchemaFile.Write(dir, grown, logId);
+
+			Assert.True(LogSchemaFile.TryLoad(dir, out var loaded, out var loadedId));
+			Assert.Equal(logId, loadedId);
+			Assert.Equal(grown.FlagNames, loaded.FlagNames);
+			Assert.False(File.Exists(Path.Combine(dir, LogSchemaFile.FileName + ".tmp")));
+		}
+		finally
+		{
+			Directory.Delete(dir, true);
+		}
+	}
 
     [Fact]
     public void IndexHeader_ConvertsTimeOffsets()
