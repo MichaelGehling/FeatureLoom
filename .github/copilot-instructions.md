@@ -33,6 +33,9 @@ Solution: `FeatureProjects.sln`.
 - When a feature needs a dedicated helper that FeatureLoom lacks, build it as a general reusable helper in the fitting FeatureLoom namespace (e.g. FeatureLoom.Helpers, Collections, Extensions) with XML docs and tests, rather than as feature-internal code. Check existing FeatureLoom tools (SlicedBuffer, Pool, SharedPool, LazyValue, LazyList, LazyDictionary, ByteSegment) before using BCL alternatives like ArrayPool.
 - **Package policy**: `FeatureLoom.Core` (planned rename to `FeatureLoom`) must stay free of external dependencies and hosts everything that needs none; optional `FeatureLoom.XXX` packages exist mainly for parts requiring additional dependencies. `net48/netstandard2.0` must stay compatible but are not the main focus; modern .NET (`net8/net10/netstandard2.1`) is primary.
 
+## Synchronization
+- Prefer FeatureLoom's own synchronization primitives over BCL `lock`/object locks: default to `MicroLock`, use `FeatureLock` when async locking is needed, and `MicroValueLock` when memory size matters.
+
 ## Token discipline
 - Read the specific file range you need, not whole files; use search to locate first.
 - Never re-read what is already in context.

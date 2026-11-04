@@ -1,3 +1,4 @@
+﻿using FeatureLoom.Synchronization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -121,7 +122,9 @@ public sealed class LogPayloadType<T> : LogPayloadType
     public LogPayloadType<T> Field(string fieldName, string constant) => Field(fieldName, (Func<T, string>)(_ => constant));
 
     /// <summary>Derives the index metadata of <paramref name="payload"/> into <paramref name="metadata"/>.</summary>
+    /// <param name="payload">Payload to derive metadata from.</param>
     /// <param name="now">Fallback timestamp if no timestamp function is configured.</param>
+    /// <param name="metadata">Container that receives the metadata; reused by callers.</param>
     /// <exception cref="InvalidOperationException">The payload type is not registered.</exception>
     public void Extract(T payload, DateTime now, LogEntryMetadata metadata)
     {
@@ -208,7 +211,7 @@ public sealed class LogPayloadType<T> : LogPayloadType
 /// </summary>
 public sealed class LogPayloadTypeRegistry
 {
-    private readonly object registerLock = new object();
+    private readonly MicroLock registerLock = new MicroLock();
     // Copy-on-write: registrations are rare, lookups happen per append/read and must not lock.
     private Dictionary<Type, LogPayloadType> byClrType = new Dictionary<Type, LogPayloadType>();
     private Dictionary<ushort, LogPayloadType> byId = new Dictionary<ushort, LogPayloadType>();
@@ -242,7 +245,7 @@ public sealed class LogPayloadTypeRegistry
     public LogPayloadTypeRegistry Register<T>(LogPayloadType<T> payloadType)
     {
         if (payloadType == null) throw new ArgumentNullException(nameof(payloadType));
-        lock (registerLock)
+        using (registerLock.Lock())
         {
             RegisterLocked(payloadType);
         }
@@ -259,7 +262,7 @@ public sealed class LogPayloadTypeRegistry
     {
         if (TryGet<T>(out var payloadType)) return payloadType;
         if (!AllowImplicitTypes) throw new InvalidOperationException($"Type {typeof(T)} is not a prepared payload type of this log.");
-        lock (registerLock)
+        using (registerLock.Lock())
         {
             if (TryGet<T>(out payloadType)) return payloadType;
             payloadType = new LogPayloadType<T>();

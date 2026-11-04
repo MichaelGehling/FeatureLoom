@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FeatureLoom.Helpers;
 
 namespace FeatureLoom.LogStorage;
@@ -10,6 +10,13 @@ namespace FeatureLoom.LogStorage;
 public static class LogIndexRecordCodec
 {
     /// <summary>Writes a full record at <paramref name="offset"/>.</summary>
+    /// <param name="schema">Schema defining the record layout.</param>
+    /// <param name="buffer">Target buffer; must hold <see cref="LogIndexSchema.RecordSize"/> bytes at <paramref name="offset"/>.</param>
+    /// <param name="offset">Start of the record in <paramref name="buffer"/>.</param>
+    /// <param name="timeOffset">Timestamp relative to the segment base time.</param>
+    /// <param name="position">Position of the payload record in the segment file.</param>
+    /// <param name="flags">Reserved and custom flags.</param>
+    /// <param name="typeId">Persisted payload type id.</param>
     /// <param name="fieldValues">Stored values of all custom fields (raw values, hashes or handles), in schema order.</param>
     /// <exception cref="ArgumentException">A value does not fit its field.</exception>
     public static void Write(LogIndexSchema schema, byte[] buffer, int offset, uint timeOffset, ulong position, ulong flags, ushort typeId, ulong[] fieldValues)

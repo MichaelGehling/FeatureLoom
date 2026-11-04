@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using FeatureLoom.Collections;
@@ -26,7 +26,7 @@ public struct LogRecord
     public ulong Flags;
     /// <summary>Payload type id from the header (<see cref="LogHeaderMode.Full"/> only).</summary>
     public ushort TypeId;
-    /// <summary>Raw values
+    /// <summary>Raw values of the custom fields from the header (<see cref="LogHeaderMode.Full"/> only).</summary>
     public ulong[] FieldValues;
     /// <summary>Source values of Hash/Handle fields (<see cref="LogHeaderMode.Full"/> only; caller-supplied array).</summary>
     public string[] FieldSources;

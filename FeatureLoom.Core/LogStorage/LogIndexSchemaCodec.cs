@@ -27,6 +27,24 @@ public static class LogIndexSchemaCodec
         return size;
     }
 
+    /// <summary>True if both schemas have the same binary layout (same encoded bytes).</summary>
+    public static bool AreEqual(LogIndexSchema a, LogIndexSchema b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a == null || b == null) return false;
+        int size = GetSize(a);
+        if (size != GetSize(b)) return false;
+        var bytesA = new byte[size];
+        var bytesB = new byte[size];
+        Write(a, bytesA, 0);
+        Write(b, bytesB, 0);
+        for (int i = 0; i < size; i++)
+        {
+            if (bytesA[i] != bytesB[i]) return false;
+        }
+        return true;
+    }
+
     /// <summary>Writes <paramref name="schema"/> at <paramref name="pos"/> and returns the position after it.</summary>
     public static int Write(LogIndexSchema schema, byte[] buffer, int pos)
     {
