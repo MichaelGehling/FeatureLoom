@@ -30,6 +30,8 @@ Solution: `FeatureProjects.sln`.
 - Add comments for non-obvious decisions. Trivial code does not need comments. Add XML comments for public APIs.
 - Propose to add/adapt a skill file for any new domain area. Skills are the primary way to communicate domain knowledge and conventions.
 - Never degrade performance/allocations of shared code to achieve .NET Framework 4.8 (netstandard2.0) compatibility, especially in hot paths; use conditional compilation blocks (#if NETSTANDARD2_0) for compatibility-specific code instead.
+- When a feature needs a dedicated helper that FeatureLoom lacks, build it as a general reusable helper in the fitting FeatureLoom namespace (e.g. FeatureLoom.Helpers, Collections, Extensions) with XML docs and tests, rather than as feature-internal code. Check existing FeatureLoom tools (SlicedBuffer, Pool, SharedPool, LazyValue, LazyList, LazyDictionary, ByteSegment) before using BCL alternatives like ArrayPool.
+- **Package policy**: `FeatureLoom.Core` (planned rename to `FeatureLoom`) must stay free of external dependencies and hosts everything that needs none; optional `FeatureLoom.XXX` packages exist mainly for parts requiring additional dependencies. `net48/netstandard2.0` must stay compatible but are not the main focus; modern .NET (`net8/net10/netstandard2.1`) is primary.
 
 ## Token discipline
 - Read the specific file range you need, not whole files; use search to locate first.
