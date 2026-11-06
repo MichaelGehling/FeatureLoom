@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text;
 using FeatureLoom.Helpers;
 using Xunit;
@@ -66,5 +66,31 @@ public class Crc32Tests
         var data = Encoding.ASCII.GetBytes("123456789");
         uint part = Crc32.Compute(data, 0, 4);
         Assert.Equal(Crc32.Compute(data), Crc32.Compute(data, 4, 5, part));
+    }
+
+    [Fact]
+    public void Compute_MatchesBytewiseReference_ForAllLengthsAndOffsets()
+    {
+        var data = new byte[300];
+        new Random(42).NextBytes(data);
+        for (int offset = 0; offset < 9; offset++)
+        {
+            for (int count = 0; count <= data.Length - offset; count += count < 40 ? 1 : 37)
+            {
+                Assert.Equal(Reference(data, offset, count, 0), Crc32.Compute(data, offset, count));
+                Assert.Equal(Reference(data, offset, count, 0x12345678u), Crc32.Compute(data, offset, count, 0x12345678u));
+            }
+        }
+    }
+
+    private static uint Reference(byte[] data, int offset, int count, uint crc)
+    {
+        uint c = ~crc;
+        for (int i = offset; i < offset + count; i++)
+        {
+            c ^= data[i];
+            for (int k = 0; k < 8; k++) c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+        }
+        return ~c;
     }
 }

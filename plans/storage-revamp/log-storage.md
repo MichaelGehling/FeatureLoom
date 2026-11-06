@@ -140,4 +140,8 @@ If a needed helper is missing (e.g. pooled `MemoryStream`, bit set, span-based b
 10. Add a skill file `.github/skills/storage`.
 
 ## Open questions
-- None currently.
+- `MultiLogReader.QueryStreamAsync<T>` (new public API, uncommitted) has no tests: add tests for merge order (forward/reverse), limit, cancellation and lazy per-log enumeration, or drop it from the commit.
+- `MultiLogReader.cs` indentation switched from spaces to tabs on unchanged lines; restore spaces to keep the diff minimal.
+- `FeatureLoom.Forms` Release build fails with MSB3822 (needs `System.Resources.Extensions` reference); unrelated to LogStorage, fix separately.
+- Optional: change `LogWriterAppendBenchmark` to reuse one string instance per user value to measure the source-encoding cache hit path (currently only the miss path is measured).
+- Optional: `CpuLookupAndClock` benchmark still measures the old per-entry lookup/clock path; adapt or remove it now that batches resolve type and clock once.

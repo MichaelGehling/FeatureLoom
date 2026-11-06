@@ -58,7 +58,18 @@ public static class LogBinaryRecordFraming
         {
             case LogHeaderMode.None: return 0;
             case LogHeaderMode.Minimal: return MinimalHeaderSize;
-            default: return FullFixedHeaderSize + GetMetaSize(schema, metadata);
+            default: return FullFixedHeaderSize + GetMetaSize(schema, metadata, null);
+        }
+    }
+
+    // Variant using a per-writer cache of UTF-8 encoded source strings.
+    internal static int GetHeaderSize(LogIndexSchema schema, LogEntryMetadata metadata, LogSourceEncodingCache sourceCache)
+    {
+        switch (schema.HeaderMode)
+        {
+            case LogHeaderMode.None: return 0;
+            case LogHeaderMode.Minimal: return MinimalHeaderSize;
+            default: return FullFixedHeaderSize + GetMetaSize(schema, metadata, sourceCache);
         }
     }
 
@@ -70,10 +81,16 @@ public static class LogBinaryRecordFraming
     public static int Write(LogIndexSchema schema, byte[] buffer, int offset, LogEntryMetadata metadata, ByteSegment payload)
     {
         if (schema == null) throw new ArgumentNullException(nameof(schema));
+        return Write(schema, buffer, offset, metadata, payload, GetHeaderSize(schema, metadata), null);
+    }
+
+    // Variant for callers that already computed the header size (avoids rescanning source strings).
+    // sourceCache (optional) must be the same cache that was passed to GetHeaderSize.
+    internal static int Write(LogIndexSchema schema, byte[] buffer, int offset, LogEntryMetadata metadata, ByteSegment payload, int headerSize, LogSourceEncodingCache sourceCache)
+    {
         if (!payload.IsValid) throw new ArgumentException("Payload is invalid.", nameof(payload));
         var payloadSegment = payload.AsArraySegment;
         int payloadCount = payloadSegment.Count;
-        int headerSize = GetHeaderSize(schema, metadata);
         int total = headerSize + payloadCount;
         if (offset < 0 || offset > buffer.Length - total) throw new ArgumentException("Buffer is too small.", nameof(buffer));
 
@@ -100,7 +117,13 @@ public static class LogBinaryRecordFraming
             if (IsSourceField(schema.Fields[i].Kind))
             {
                 string source = metadata.GetSource(i) ?? string.Empty;
-                int length = Encoding.UTF8.GetBytes(source, 0, source.Length, buffer, pos + 2);
+                int length;
+                if (sourceCache != null)
+                {
+                    length = sourceCache.GetLength(i, source);
+                    Buffer.BlockCopy(sourceCache.GetBuffer(i), 0, buffer, pos + 2, length);
+                }
+                else length = Encoding.UTF8.GetBytes(source, 0, source.Length, buffer, pos + 2);
                 LittleEndian.WriteUInt16(buffer, pos, (ushort)length);
                 pos += 2 + length;
             }
@@ -173,7 +196,7 @@ public static class LogBinaryRecordFraming
         return pos == end ? LogRecordReadStatus.Ok : LogRecordReadStatus.Corrupt;
     }
 
-    private static int GetMetaSize(LogIndexSchema schema, LogEntryMetadata metadata)
+    private static int GetMetaSize(LogIndexSchema schema, LogEntryMetadata metadata, LogSourceEncodingCache sourceCache)
     {
         int size = FullFixedMetaSize;
         for (int i = 0; i < schema.Fields.Count; i++)
@@ -181,7 +204,7 @@ public static class LogBinaryRecordFraming
             if (IsSourceField(schema.Fields[i].Kind))
             {
                 string source = metadata?.GetSource(i);
-                int length = source == null ? 0 : Encoding.UTF8.GetByteCount(source);
+                int length = source == null ? 0 : sourceCache != null ? sourceCache.GetLength(i, source) : Encoding.UTF8.GetByteCount(source);
                 if (length > ushort.MaxValue) throw new ArgumentException($"Source value of field '{schema.Fields[i].Name}' is too long.", nameof(metadata));
                 size += 2 + length;
             }
@@ -191,4 +214,39 @@ public static class LogBinaryRecordFraming
     }
 
     private static bool IsSourceField(LogFieldKind kind) => kind == LogFieldKind.Hash || kind == LogFieldKind.Handle;
+}
+
+/// <summary>
+/// Caches the UTF-8 encoding of the last source string per field. Sources (e.g. logger names) usually repeat
+/// from entry to entry, so a reference check avoids re-encoding. On a miss the string is encoded into a reused
+/// per-field buffer, so changing sources do not allocate. Not thread-safe; owned by a single writer.
+/// </summary>
+internal sealed class LogSourceEncodingCache
+{
+    private string[] sources = new string[0];
+    private byte[][] buffers = new byte[0][];
+    private int[] lengths = new int[0];
+
+    /// <summary>Returns the UTF-8 length of <paramref name="source"/>; the bytes are available via <see cref="GetBuffer"/>.</summary>
+    public int GetLength(int field, string source)
+    {
+        if (field >= sources.Length)
+        {
+            Array.Resize(ref sources, field + 1);
+            Array.Resize(ref buffers, field + 1);
+            Array.Resize(ref lengths, field + 1);
+        }
+        // Reference equality suffices: strings are immutable and repeated sources are typically the same instance.
+        if (ReferenceEquals(sources[field], source)) return lengths[field];
+        var buffer = buffers[field];
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(source.Length);
+        if (buffer == null || buffer.Length < maxBytes) buffers[field] = buffer = new byte[Math.Max(maxBytes, 32)];
+        int length = Encoding.UTF8.GetBytes(source, 0, source.Length, buffer, 0);
+        sources[field] = source;
+        lengths[field] = length;
+        return length;
+    }
+
+    /// <summary>Buffer holding the encoded bytes of the last source passed to <see cref="GetLength"/> for the field.</summary>
+    public byte[] GetBuffer(int field) => buffers[field];
 }

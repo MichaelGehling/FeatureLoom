@@ -7,7 +7,7 @@ using Xunit;
 
 namespace FeatureLoom.Tests.LogStorage;
 
-public class LogReaderTests : IDisposable
+public partial class LogReaderTests : IDisposable
 {
     public class Msg
     {
@@ -85,6 +85,26 @@ public class LogReaderTests : IDisposable
         var others = await reader.QueryAsync<Other>(new LogQuery());
         Assert.Equal("x", Assert.Single(others).Payload.Text);
         Assert.Equal(4, await reader.CountAsync(new LogQuery()));
+    }
+
+    [Fact]
+    public async Task Query_RoundTripsRepeatedAndChangingSources()
+    {
+        // Exercises the writer's UTF-8 source cache: same instance repeated, equal but distinct instances, empty, null and non-ASCII.
+        var schema = CreateSchema();
+        string alice = "alice";
+        var users = new[] { alice, alice, new string(alice.ToCharArray()), "Jörg", "", null, "Jörg", alice };
+        using (var writer = CreateWriter(schema))
+        {
+            writer.AppendMany(users.Select((u, i) => new Msg { Time = T0.AddSeconds(i), Level = 1, User = u }));
+        }
+        using var reader = CreateReader(schema);
+        var entries = await reader.QueryAsync<Msg>(new LogQuery());
+        Assert.Equal(users.Select(u => u ?? ""), entries.Select(e => e.Payload.User ?? ""));
+        var byUser = await reader.QueryAsync<Msg>(new LogQuery { FieldFilters = new[] { LogFieldFilter.SourceEquals(1, "Jörg") } });
+        Assert.Equal(2, byUser.Count);
+        byUser = await reader.QueryAsync<Msg>(new LogQuery { FieldFilters = new[] { LogFieldFilter.SourceEquals(1, alice) } });
+        Assert.Equal(4, byUser.Count);
     }
 
     [Fact]
@@ -342,5 +362,45 @@ public class LogReaderTests : IDisposable
         Assert.Single(System.IO.Directory.GetFiles(directory, "*.idx"));
         using var reader = CreateReader(schema);
         Assert.Equal(T0, (await reader.QueryAsync<Msg>(new LogQuery())).First().Info.Timestamp);
+    }
+
+    [Fact]
+    public async Task AppendMany_WritesAllEntriesInOrder()
+    {
+        var schema = CreateSchema();
+        System.Collections.Generic.List<LogEntryId> ids;
+        using (var writer = CreateWriter(schema))
+        {
+            ids = writer.AppendMany(Enumerable.Range(0, 100).Select(i => new Msg { Level = i, Time = T0.AddSeconds(i) }));
+            Assert.Empty(writer.AppendMany(Enumerable.Empty<Msg>()));
+        }
+        Assert.Equal(100, ids.Count);
+        Assert.Equal(Enumerable.Range(0, 100).Select(i => (uint)i), ids.Select(id => id.EntryIndex));
+        using var reader = CreateReader(schema);
+        Assert.Equal(Enumerable.Range(0, 100), (await reader.QueryAsync<Msg>(new LogQuery())).Select(e => e.Payload.Level));
+        var (found, entry) = await reader.TryReadAsync<Msg>(ids[42]);
+        Assert.True(found);
+        Assert.Equal(42, entry.Payload.Level);
+    }
+
+    [Fact]
+    public async Task MultiLogReader_InterleavesAndRespectsLimit()
+    {
+        var schema = CreateSchema();
+        string dirB = Path.Combine(directory, "b");
+        string dirA = Path.Combine(directory, "a");
+        LogPayloadTypeRegistry Registry(string dir) => new LogPayloadTypeRegistry(schema, LogPayloadTypeMap.Load(dir)).Register(new LogPayloadType<Msg>(name: "msg").Timestamp(m => m.Time).Field("level", m => (ulong)m.Level));
+        using (var a = new LogWriter(new LogStorageOptions { Directory = dirA, Schema = schema }, Registry(dirA)))
+        using (var b = new LogWriter(new LogStorageOptions { Directory = dirB, Schema = schema }, Registry(dirB)))
+        {
+            for (int i = 0; i < 10; i++) (i % 2 == 0 ? a : b).Append(new Msg { Level = i, Time = T0.AddSeconds(i) });
+        }
+        using var ra = new LogReader(dirA, Registry(dirA));
+        using var rb = new LogReader(dirB, Registry(dirB));
+        var multi = new MultiLogReader(new ILogReader[] { ra, rb });
+        Assert.Equal(Enumerable.Range(0, 10), (await multi.QueryAsync<Msg>(new LogQuery())).Select(e => e.Payload.Level));
+        Assert.Equal(new[] { 9, 8, 7 }, (await multi.QueryAsync<Msg>(new LogQuery { Reverse = true, Limit = 3 })).Select(e => e.Payload.Level));
+        Assert.Equal(new[] { 3, 4, 5 }, (await multi.QueryAsync<Msg>(new LogQuery { From = T0.AddSeconds(3), Limit = 3 })).Select(e => e.Payload.Level));
+        Assert.Empty(await multi.QueryAsync<Msg>(new LogQuery { Limit = 0 }));
     }
 }

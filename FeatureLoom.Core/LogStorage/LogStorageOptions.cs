@@ -44,11 +44,29 @@ public sealed class LogMaintenancePolicy
 /// <summary>Controls batching of writes and flushing to disk.</summary>
 public sealed class LogFlushPolicy
 {
-    /// <summary>Maximum number of buffered entries before writing.</summary>
+    /// <summary>
+    /// Number of queued asynchronous appends that ends the <see cref="MaxBufferDelay"/> wait early.
+    /// </summary>
     public int MaxBufferedEntries { get; set; } = 1000;
 
-    /// <summary>Maximum time an entry stays buffered before writing.</summary>
-    public TimeSpan MaxBufferDelay { get; set; } = TimeSpan.FromMilliseconds(100);
+    /// <summary>
+    /// Time the background flush loop waits to collect more asynchronous appends before writing a batch.
+    /// Zero (default) writes immediately; concurrent appends arriving while a batch is written still share the next batch.
+    /// </summary>
+    public TimeSpan MaxBufferDelay { get; set; } = TimeSpan.Zero;
+
+    /// <summary>
+    /// Maximum number of log entries in the asynchronous append queue (all entries of an <c>AppendManyAsync</c> call are counted).
+    /// When reached, enqueuing callers (<c>AppendAsync</c>, <c>AppendManyAsync</c>, <c>Enqueue</c>, sink posts) block synchronously
+    /// until the background loop has taken the queue. Zero or negative (default) means unlimited.
+    /// A single <c>AppendManyAsync</c> call larger than the limit is admitted once the queue is empty.
+    /// </summary>
+    /// <remarks>
+    /// Lazy enumerables passed to <c>AppendManyAsync</c> are materialized before the caller blocks.
+    /// Must not be used if an <see cref="ILogAppendCallback"/> enqueues into the same writer: callbacks run on the
+    /// background loop, so blocking there would deadlock.
+    /// </remarks>
+    public int MaxQueuedEntries { get; set; }
 
     /// <summary>Flush to the physical disk (fsync) after each write batch.</summary>
     public bool FlushToDisk { get; set; }
