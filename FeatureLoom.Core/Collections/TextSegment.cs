@@ -246,24 +246,24 @@ public struct TextSegment : IReadOnlyList<char>, IEquatable<TextSegment>, IEquat
     }
 
     /// <summary>
-    /// Returns a string representing the subsegment that starts after the specified <paramref name="startAfter"/> segment and ends before the specified <paramref name="endBefore"/> segment.
+    /// Returns a TextSegment representing the subsegment that starts after the specified <paramref name="startAfter"/> segment and ends before the specified <paramref name="endBefore"/> segment.
     /// </summary>
     /// <param name="startAfter">The segment after which the subsegment should start.</param>
     /// <param name="endBefore">The segment before which the subsegment should end.</param>
     /// <param name="includeSearchStrings">If true, includes the search strings in the result.</param>
-    /// <returns>The substring for the specified subsegment, or null if not found.</returns>
-    public string SubSegment(TextSegment startAfter, TextSegment endBefore, bool includeSearchStrings = false)
+    /// <returns>The TextSegment for the specified subsegment, or null if not found.</returns>
+    public TextSegment? SubSegment(TextSegment startAfter, TextSegment endBefore, bool includeSearchStrings = false)
     {
         return SubSegment(0, startAfter, endBefore, out _, includeSearchStrings);
     }
 
     /// <summary>
-    /// Returns a string representing the subsegment that starts after the specified <paramref name="startAfter"/> segment and ends at the end of this segment.
+    /// Returns a TextSegment representing the subsegment that starts after the specified <paramref name="startAfter"/> segment and ends at the end of this segment.
     /// </summary>
     /// <param name="startAfter">The segment after which the subsegment should start.</param>
     /// <param name="includeSearchStrings">If true, includes the search string in the result.</param>
-    /// <returns>The substring for the specified subsegment, or null if not found.</returns>
-    public string SubSegment(TextSegment startAfter, bool includeSearchStrings = false)
+    /// <returns>The TextSegment for the specified subsegment, or null if not found.</returns>
+    public TextSegment? SubSegment(TextSegment startAfter, bool includeSearchStrings = false)
     {
         return SubSegment(0, startAfter, Empty, out _, includeSearchStrings);
     }
