@@ -52,10 +52,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.3.10" />
-    <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.3.10" />
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.0" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.3.14" />
+		<PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.3.14" />
+    <PackageReference Include="Microsoft.AspNetCore.WebSockets" Version="2.3.14" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.92.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
   </ItemGroup>
 
   <ItemGroup>
